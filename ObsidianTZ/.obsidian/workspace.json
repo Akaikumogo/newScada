@@ -1,0 +1,226 @@
+{
+  "main": {
+    "id": "main",
+    "type": "split",
+    "children": [
+      {
+        "id": "96a01572b057bf74",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "6dfa9a9548809bf2",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "03 - API Dizayn.md",
+                "mode": "source",
+                "source": false
+              },
+              "icon": "lucide-file",
+              "title": "03 - API Dizayn"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "vertical"
+  },
+  "left": {
+    "id": "sidebar-left",
+    "type": "split",
+    "children": [
+      {
+        "id": "70ca19bcda775ef3",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "file-explorer",
+            "type": "leaf",
+            "state": {
+              "type": "file-explorer",
+              "state": {
+                "sortOrder": "alphabetical",
+                "autoReveal": true
+              },
+              "icon": "lucide-folder-closed",
+              "title": "Files"
+            }
+          },
+          {
+            "id": "bc25a650336240f7",
+            "type": "leaf",
+            "state": {
+              "type": "search",
+              "state": {
+                "query": "tag:#events",
+                "matchingCase": false,
+                "explainSearch": false,
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical"
+              },
+              "icon": "lucide-search",
+              "title": "Search"
+            }
+          },
+          {
+            "id": "0e012025db88e214",
+            "type": "leaf",
+            "state": {
+              "type": "bookmarks",
+              "state": {},
+              "icon": "lucide-bookmark",
+              "title": "Bookmarks"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300
+  },
+  "right": {
+    "id": "36d68a63fcea0956",
+    "type": "split",
+    "children": [
+      {
+        "id": "17d0f0f0e1dd7832",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "45e44cb5ad94f365",
+            "type": "leaf",
+            "state": {
+              "type": "backlink",
+              "state": {
+                "file": "000 MOC - newScada.md",
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical",
+                "showSearch": false,
+                "searchQuery": "",
+                "backlinkCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-coming-in",
+              "title": "Backlinks for 000 MOC - newScada"
+            }
+          },
+          {
+            "id": "3dd892daff23811c",
+            "type": "leaf",
+            "state": {
+              "type": "outgoing-link",
+              "state": {
+                "file": "000 MOC - newScada.md",
+                "linksCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-going-out",
+              "title": "Outgoing links from 000 MOC - newScada"
+            }
+          },
+          {
+            "id": "97400380ceea7a91",
+            "type": "leaf",
+            "state": {
+              "type": "tag",
+              "state": {
+                "sortOrder": "frequency",
+                "useHierarchy": true,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-tags",
+              "title": "Tags"
+            }
+          },
+          {
+            "id": "629d8bb4ef2c0c08",
+            "type": "leaf",
+            "state": {
+              "type": "all-properties",
+              "state": {
+                "sortOrder": "frequency",
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-archive",
+              "title": "All properties"
+            }
+          },
+          {
+            "id": "f7986cc815ef5915",
+            "type": "leaf",
+            "state": {
+              "type": "outline",
+              "state": {
+                "file": "000 MOC - newScada.md",
+                "followCursor": false,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-list",
+              "title": "Outline of 000 MOC - newScada"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300,
+    "collapsed": true
+  },
+  "left-ribbon": {
+    "hiddenItems": {
+      "switcher:Open quick switcher": false,
+      "graph:Open graph view": false,
+      "canvas:Create new canvas": false,
+      "daily-notes:Open today's daily note": false,
+      "templates:Insert template": false,
+      "command-palette:Open command palette": false,
+      "bases:Create new base": false
+    }
+  },
+  "active": "6dfa9a9548809bf2",
+  "lastOpenFiles": [
+    "04 - Editor.md",
+    "05 - Dispatcher.md",
+    "06 - IEC104 Config.md",
+    "07 - Schema Editor.md",
+    "08 - Feature List.md",
+    "REPORT.md",
+    "Requirements.md",
+    "ADR/ADR-001 Clean Architecture.md",
+    "ADR/ADR-002 WebSocket vs Polling.md",
+    "features/F05 - IEC104 Signal Config.md",
+    "02 - DB Sxema.md",
+    "01 - Reja.md",
+    "ADR/ADR-005 Redis Cache.md",
+    "000 MOC - newScada.md",
+    "Architecture/Data Flow.md",
+    "Design/frontend/UI/Layout.md",
+    "Design/frontend/UX/Interaction Patterns.md",
+    "backend/app/api/websocket/__pycache__/__init__.cpython-314.pyc",
+    "backend/app/api/websocket/__pycache__/manager.cpython-314.pyc",
+    "backend/app/api/websocket/__pycache__/telemetry_ws.cpython-314.pyc",
+    "backend/app/api/websocket/__pycache__",
+    "backend/alembic/versions/__pycache__/20260524_0001_uuidv7_schema.cpython-314.pyc",
+    "backend/alembic/versions/__pycache__",
+    "backend/tests/__pycache__/test_app.cpython-314-pytest-9.0.3.pyc",
+    "backend/tests/__pycache__",
+    "backend/app/__pycache__/__init__.cpython-314.pyc",
+    "backend/app/__pycache__/main.cpython-314.pyc",
+    "backend/README.md",
+    "Design/Design Index.md",
+    "Design/editor/UX/Interaction Patterns.md",
+    "Design/editor/UX/Wireframes.md",
+    "Design/editor/UX/User Flows.md",
+    "Design/editor/UI/Layout.md",
+    "Design/editor/UI/Component Library.md",
+    "Design/editor/UI/Typography.md",
+    "Design/frontend/UI/Typography.md",
+    "Untitled.canvas"
+  ]
+}

@@ -1,0 +1,86 @@
+======================================================================
+  IEC 104 TO'LIQ SKAN NATIJASI
+  Sana: 2026-05-25 11:25:51
+  Qurilmalar soni: 1
+======================================================================
+
+  TCP ochiq:      1 / 1
+  IEC 104 javob:  1 / 1
+  Ma'lumot bor:   1 / 1
+
+----------------------------------------------------------------------
+
+>>> 192.168.199.10:2404
+    TCP:     OCHIQ
+    IEC104:  OK
+    CASDU:   3
+    Signal:  15 ta (15 analog, 0 holat)
+
+         IOA  Tur          Kategoriya Qiymat         Vaqt
+         ---  ---          ---        ---            ---
+         641  IEEE_F+T     analog     0.001589       2026-05-25 08:32:25.361
+         642  IEEE_F+T     analog     0.001096       2026-05-25 08:32:25.361
+         643  IEEE_F+T     analog     0.001111       2026-05-25 08:32:25.361
+         644  IEEE_F+T     analog     69.837395      2026-05-25 08:32:25.361
+         658  IEEE_F+T     analog     4e-05          2026-05-25 08:32:25.361
+         659  IEEE_F+T     analog     0.002604       2026-05-25 08:32:25.361
+         660  IEEE_F+T     analog     155.856064     2026-05-25 08:32:25.361
+         661  IEEE_F+T     analog     1.897076       2026-05-25 08:32:25.361
+         667  IEEE_F+T     analog     0.000566       2026-05-25 08:32:25.361
+         668  IEEE_F+T     analog     0.000761       2026-05-25 08:32:25.361
+         670  IEEE_F+T     analog     0.001589       2026-05-25 08:32:25.361
+         671  IEEE_F+T     analog     -28.500578     2026-05-25 08:32:25.361
+         672  IEEE_F+T     analog     0.001212       2026-05-25 08:32:25.353
+         673  IEEE_F+T     analog     -118.930939    2026-05-25 08:32:25.353
+         674  IEEE_F+T     analog     0.000845       2026-05-25 08:32:25.353
+
+
+======================================================================
+  IOA XULOSA JADVALI (faqat ma'lumot bor qurilmalar)
+======================================================================
+
+  192.168.199.10 (CASDU=3):
+    IOA    641  IEEE_F+T    analog    = 0.001589
+    IOA    642  IEEE_F+T    analog    = 0.001096
+    IOA    643  IEEE_F+T    analog    = 0.001111
+    IOA    644  IEEE_F+T    analog    = 69.837395
+    IOA    658  IEEE_F+T    analog    = 4e-05
+    IOA    659  IEEE_F+T    analog    = 0.002604
+    IOA    660  IEEE_F+T    analog    = 155.856064
+    IOA    661  IEEE_F+T    analog    = 1.897076
+    IOA    667  IEEE_F+T    analog    = 0.000566
+    IOA    668  IEEE_F+T    analog    = 0.000761
+    IOA    670  IEEE_F+T    analog    = 0.001589
+    IOA    671  IEEE_F+T    analog    = -28.500578
+    IOA    672  IEEE_F+T    analog    = 0.001212
+    IOA    673  IEEE_F+T    analog    = -118.930939
+    IOA    674  IEEE_F+T    analog    = 0.000845
+
+======================================================================
+  KATALOG SHABLONI (import_catalog.py uchun)
+======================================================================
+
+ANALOG_POINTS = {
+    641: {"code": "ioa_641", "title": "IOA 641 (IEEE_F+T, qiymat=0.001589)", "unit": ""},
+    642: {"code": "ioa_642", "title": "IOA 642 (IEEE_F+T, qiymat=0.001096)", "unit": ""},
+    643: {"code": "ioa_643", "title": "IOA 643 (IEEE_F+T, qiymat=0.001111)", "unit": ""},
+    644: {"code": "ioa_644", "title": "IOA 644 (IEEE_F+T, qiymat=69.837395)", "unit": ""},
+    658: {"code": "ioa_658", "title": "IOA 658 (IEEE_F+T, qiymat=4e-05)", "unit": ""},
+    659: {"code": "ioa_659", "title": "IOA 659 (IEEE_F+T, qiymat=0.002604)", "unit": ""},
+    660: {"code": "ioa_660", "title": "IOA 660 (IEEE_F+T, qiymat=155.856064)", "unit": ""},
+    661: {"code": "ioa_661", "title": "IOA 661 (IEEE_F+T, qiymat=1.897076)", "unit": ""},
+    667: {"code": "ioa_667", "title": "IOA 667 (IEEE_F+T, qiymat=0.000566)", "unit": ""},
+    668: {"code": "ioa_668", "title": "IOA 668 (IEEE_F+T, qiymat=0.000761)", "unit": ""},
+    670: {"code": "ioa_670", "title": "IOA 670 (IEEE_F+T, qiymat=0.001589)", "unit": ""},
+    671: {"code": "ioa_671", "title": "IOA 671 (IEEE_F+T, qiymat=-28.500578)", "unit": ""},
+    672: {"code": "ioa_672", "title": "IOA 672 (IEEE_F+T, qiymat=0.001212)", "unit": ""},
+    673: {"code": "ioa_673", "title": "IOA 673 (IEEE_F+T, qiymat=-118.930939)", "unit": ""},
+    674: {"code": "ioa_674", "title": "IOA 674 (IEEE_F+T, qiymat=0.000845)", "unit": ""},
+}
+
+STATUS_POINTS = {
+}
+
+======================================================================
+  Skan tugadi: 2026-05-25 11:25:51
+======================================================================

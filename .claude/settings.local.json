@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx tsc *)",
+      "Bash(python -c ' *)",
+      "PowerShell(try { \\(Get-Command redis-server -ErrorAction Stop\\).Source } catch {}; try { docker --version } catch {}; try { wsl --list --quiet } catch {})"
+    ]
+  }
+}

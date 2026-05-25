@@ -1,0 +1,208 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ═══════════════════════════════════════════════════════════════
+   CSS Design Tokens — Dark (default) / Light
+═══════════════════════════════════════════════════════════════ */
+:root {
+  /* Backgrounds */
+  --bg-base:        #040610;
+  --bg-elevated:    #060812;
+  --bg-card:        #0C0F1E;
+  --bg-card-hover:  #141728;
+  --bg-subtle:      #1E2240;
+
+  /* Borders */
+  --border:         rgba(30, 34, 64, 0.9);
+  --border-hover:   rgba(41, 121, 255, 0.30);
+  --border-active:  rgba(41, 121, 255, 0.60);
+
+  /* Text */
+  --text:           #E8EBF8;
+  --text-secondary: #6B7494;
+  --text-tertiary:  #3D4270;
+
+  /* Brand */
+  --electric:       #2979FF;
+  --electric-light: #5C9DFF;
+  --electric-glow:  rgba(41, 121, 255, 0.20);
+
+  /* Status */
+  --online:         #00D68F;
+  --online-glow:    rgba(0, 214, 143, 0.20);
+  --offline:        #FF3D71;
+  --offline-glow:   rgba(255, 61, 113, 0.20);
+  --warning:        #FFAA00;
+  --warning-glow:   rgba(255, 170, 0, 0.20);
+  --stale:          #7B8ECC;
+
+  /* Premium */
+  --gold:           #FFD060;
+  --gold-glow:      rgba(255, 208, 96, 0.20);
+
+  /* Transitions */
+  --transition-fast:   150ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-base:   250ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-slow:   400ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-spring: 400ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.light {
+  --bg-base:        #F0F4FF;
+  --bg-elevated:    #FFFFFF;
+  --bg-card:        #FFFFFF;
+  --bg-card-hover:  #F5F8FF;
+  --bg-subtle:      #EEF2FF;
+  --border:         rgba(224, 231, 255, 0.9);
+  --border-hover:   rgba(41, 121, 255, 0.30);
+  --border-active:  rgba(41, 121, 255, 0.60);
+  --text:           #0A0E2A;
+  --text-secondary: #5C6394;
+  --text-tertiary:  #A0AAD4;
+  --electric:       #2979FF;
+  --electric-glow:  rgba(41, 121, 255, 0.12);
+  --online:         #00B87A;
+  --online-glow:    rgba(0, 184, 122, 0.12);
+  --offline:        #E5284F;
+  --offline-glow:   rgba(229, 40, 79, 0.12);
+  --warning:        #D4900A;
+  --warning-glow:   rgba(212, 144, 10, 0.12);
+  --gold:           #C8960A;
+  --gold-glow:      rgba(200, 150, 10, 0.12);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   Base Reset
+═══════════════════════════════════════════════════════════════ */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html {
+  scroll-behavior: smooth;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  font-family: 'Inter', system-ui, sans-serif;
+  font-size: 14px;
+  background-color: var(--bg-base);
+  color: var(--text);
+  transition: background-color var(--transition-slow), color var(--transition-slow);
+  overflow-x: hidden;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   Scrollbar — Ultra thin, premium
+═══════════════════════════════════════════════════════════════ */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--bg-subtle) transparent;
+}
+*::-webkit-scrollbar { width: 4px; height: 4px; }
+*::-webkit-scrollbar-track { background: transparent; }
+*::-webkit-scrollbar-thumb {
+  background: var(--bg-subtle);
+  border-radius: 999px;
+}
+*::-webkit-scrollbar-thumb:hover { background: var(--text-tertiary); }
+
+/* ═══════════════════════════════════════════════════════════════
+   Glass Card Mixin
+═══════════════════════════════════════════════════════════════ */
+@layer components {
+  .glass-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    box-shadow: 0 4px 24px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.04);
+    transition:
+      border-color var(--transition-base),
+      box-shadow var(--transition-base),
+      transform var(--transition-base);
+  }
+  .glass-card:hover {
+    border-color: var(--border-hover);
+    box-shadow:
+      0 8px 40px rgba(0,0,0,0.55),
+      0 0 0 1px rgba(41,121,255,0.10),
+      inset 0 1px 0 rgba(255,255,255,0.06);
+    transform: translateY(-2px);
+  }
+
+  /* Signal value flash */
+  .signal-flash {
+    animation: signalFlash 1.2s ease-out;
+  }
+  @keyframes signalFlash {
+    0%   { background-color: rgba(41, 121, 255, 0.18); }
+    100% { background-color: transparent; }
+  }
+
+  /* Skeleton shimmer */
+  .skeleton {
+    background: linear-gradient(
+      90deg,
+      var(--bg-card) 0%,
+      var(--bg-subtle) 50%,
+      var(--bg-card) 100%
+    );
+    background-size: 200% 100%;
+    animation: shimmer 1.8s ease-in-out infinite;
+  }
+  @keyframes shimmer {
+    0%   { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+  }
+
+  /* Status ring pulse */
+  @keyframes statusRing {
+    0%, 100% { transform: scale(1); opacity: 0.8; }
+    50%       { transform: scale(1.5); opacity: 0; }
+  }
+
+  /* Gradient border effect */
+  .gradient-border {
+    position: relative;
+  }
+  .gradient-border::before {
+    content: '';
+    position: absolute;
+    inset: -1px;
+    border-radius: inherit;
+    padding: 1px;
+    background: linear-gradient(135deg, rgba(41,121,255,0.4) 0%, rgba(41,121,255,0.0) 50%, rgba(41,121,255,0.2) 100%);
+    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    pointer-events: none;
+  }
+
+  /* Mono number display */
+  .mono-value {
+    font-family: 'JetBrains Mono', monospace;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.02em;
+  }
+
+  /* Focus ring */
+  .focus-ring {
+    outline: none;
+    ring: 2px;
+    ring-color: var(--electric);
+    ring-offset: 2px;
+    ring-offset-color: var(--bg-card);
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   Selection color
+═══════════════════════════════════════════════════════════════ */
+::selection {
+  background: rgba(41, 121, 255, 0.30);
+  color: var(--text);
+}
