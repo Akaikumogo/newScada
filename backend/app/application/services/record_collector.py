@@ -8,8 +8,15 @@ from datetime import datetime, timezone
 from sqlalchemy import insert, select
 
 from app.core.config import settings
+from app.infrastructure.cache.redis_cache import (
+    publish_live,
+    set_signal_value,
+)
+# NOTE: device online/offline status is owned exclusively by PingMonitor.
+# RecordCollector only persists values + broadcasts signal_update events.
 from app.infrastructure.db.database import AsyncSessionFactory
 from app.infrastructure.db.models import Device, DeviceSignal, Record
+from app.infrastructure.events.bus import bus
 from app.infrastructure.iec104 import Iec104Config, SignalValue, read_live_values
 
 logger = logging.getLogger(__name__)
@@ -114,6 +121,7 @@ class RecordCollector:
             )
 
             rows = [row for result in results for row in result.records]
+            await self._publish_realtime(results)
             if rows:
                 await session.execute(insert(Record), rows)
                 await session.commit()
@@ -177,6 +185,8 @@ class RecordCollector:
             try:
                 values = await asyncio.to_thread(read_live_values, cfg, wanted_ioas)
             except Exception as exc:
+                # Don't touch device_status — that's PingMonitor's job.
+                # Transient IEC-104 failures shouldn't mark device offline.
                 return DeviceReadResult(
                     device_id=device.id,
                     host=device.iec104_host,
@@ -193,6 +203,31 @@ class RecordCollector:
             records=self._build_records(device, signals, values, captured_at),
             read_count=len(values),
         )
+
+    async def _publish_realtime(self, results: list[DeviceReadResult]) -> None:
+        for result in results:
+            if result.error:
+                continue
+            # device_status is owned by PingMonitor — don't touch it here.
+            for record in result.records:
+                signal_ts = record["captured_at"].isoformat()
+                message = {
+                    "type": "signal_update",
+                    "device_id": record["device_id"],
+                    "signal_name": record["signal_name"],
+                    "value": record["value"],
+                    "quality": record["quality"],
+                    "ts": signal_ts,
+                }
+                await set_signal_value(
+                    device_id=record["device_id"],
+                    signal_name=record["signal_name"],
+                    value=record["value"],
+                    quality=record["quality"],
+                    ts=signal_ts,
+                )
+                await publish_live(message)
+                await bus.publish(message)
 
     @staticmethod
     def _build_records(

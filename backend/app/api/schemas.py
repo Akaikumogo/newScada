@@ -228,6 +228,17 @@ class RecordOut(BaseModel):
     captured_at: datetime
 
 
+class RangePoint(BaseModel):
+    """Aggregated bucket for trading-style range queries (OHLC-like)."""
+    ts:    datetime          # bucket start time
+    open:  float             # first value in bucket
+    high:  float             # max value in bucket
+    low:   float             # min value in bucket
+    close: float             # last value in bucket
+    avg:   float             # average value in bucket
+    count: int               # number of raw records in bucket
+
+
 class LiveSignalValue(BaseModel):
     signal_name: str
     value: float | None

@@ -30,6 +30,12 @@ class Settings(BaseSettings):
     IEC_RECORD_IDLE_AFTER_DATA_SECONDS: float = 0.4
     IEC_RECORD_MAX_PARALLEL_POLLS: int = 10
 
+    # Ping-based online/offline monitor
+    PING_MONITOR_ENABLED: bool = True
+    PING_INTERVAL_SECONDS: float = 5.0
+    PING_TIMEOUT_SECONDS: float = 1.0
+    PING_MAX_PARALLEL: int = 20
+
     @field_validator("ALLOWED_ORIGINS", mode="before")
     @classmethod
     def parse_origins(cls, v):

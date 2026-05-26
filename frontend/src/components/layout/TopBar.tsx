@@ -1,6 +1,6 @@
 import { motion, AnimatePresence } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
-import { Zap, Moon, Sun, Wifi, WifiOff, Loader2 } from 'lucide-react'
+import { DatabaseZap, Zap, Moon, Sun, Wifi, WifiOff, Loader2, GitCompare } from 'lucide-react'
 import { useTheme } from '@/hooks/useTheme'
 import { useDispatcherStore } from '@/store/dispatcher'
 import type { Branch, Substation } from '@/types'
@@ -167,6 +167,37 @@ export function TopBar({ branches, substations, onBranchChange }: Props) {
 
         {/* WS indicator */}
         <WsIndicator />
+
+        <motion.button
+          onClick={() => navigate('/diff')}
+          className="
+            h-8 px-3 rounded-xl flex items-center gap-1.5
+            bg-[var(--bg-card)] border border-[var(--border)]
+            text-ink-200 hover:text-[var(--text)]
+            hover:border-[var(--border-hover)] transition-all text-[12px]
+          "
+          whileHover={{ scale: 1.03 }}
+          whileTap={{ scale: 0.96 }}
+          title="Cross-device signal comparison"
+        >
+          <GitCompare size={13} />
+          Diff
+        </motion.button>
+
+        <motion.button
+          onClick={() => navigate('/realtime')}
+          className="
+            h-8 px-3 rounded-xl flex items-center gap-1.5
+            bg-[var(--bg-card)] border border-[var(--border)]
+            text-ink-200 hover:text-[var(--text)]
+            hover:border-[var(--border-hover)] transition-all text-[12px]
+          "
+          whileHover={{ scale: 1.03 }}
+          whileTap={{ scale: 0.96 }}
+        >
+          <DatabaseZap size={13} />
+          Redis
+        </motion.button>
 
         {/* Theme toggle */}
         <motion.button

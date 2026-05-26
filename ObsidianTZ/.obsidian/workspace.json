@@ -11,14 +11,10 @@
             "id": "6dfa9a9548809bf2",
             "type": "leaf",
             "state": {
-              "type": "markdown",
-              "state": {
-                "file": "03 - API Dizayn.md",
-                "mode": "source",
-                "source": false
-              },
-              "icon": "lucide-file",
-              "title": "03 - API Dizayn"
+              "type": "graph",
+              "state": {},
+              "icon": "lucide-git-fork",
+              "title": "Graph view"
             }
           }
         ]
@@ -78,7 +74,8 @@
       }
     ],
     "direction": "horizontal",
-    "width": 300
+    "width": 300,
+    "collapsed": true
   },
   "right": {
     "id": "36d68a63fcea0956",
@@ -94,7 +91,6 @@
             "state": {
               "type": "backlink",
               "state": {
-                "file": "000 MOC - newScada.md",
                 "collapseAll": false,
                 "extraContext": false,
                 "sortOrder": "alphabetical",
@@ -104,7 +100,7 @@
                 "unlinkedCollapsed": true
               },
               "icon": "links-coming-in",
-              "title": "Backlinks for 000 MOC - newScada"
+              "title": "Backlinks"
             }
           },
           {
@@ -185,6 +181,19 @@
   },
   "active": "6dfa9a9548809bf2",
   "lastOpenFiles": [
+    "Templates/Feature Template.md",
+    "Untitled.md",
+    "Templates/ADR Template.md",
+    "Technical/IEC104 Deep Dive.md",
+    "Design/editor/UX/User Flows.md",
+    "Design/editor/UI/Color System.md",
+    "Design/editor/UI/Component Library.md",
+    "Design/editor/UI/Typography.md",
+    "02 - DB Sxema.md",
+    "Technical/React Flow Patterns.md",
+    "Technical/FastAPI Patterns.md",
+    "ADR/ADR-003 React Flow.md",
+    "03 - API Dizayn.md",
     "04 - Editor.md",
     "05 - Dispatcher.md",
     "06 - IEC104 Config.md",
@@ -195,13 +204,9 @@
     "ADR/ADR-001 Clean Architecture.md",
     "ADR/ADR-002 WebSocket vs Polling.md",
     "features/F05 - IEC104 Signal Config.md",
-    "02 - DB Sxema.md",
     "01 - Reja.md",
     "ADR/ADR-005 Redis Cache.md",
     "000 MOC - newScada.md",
-    "Architecture/Data Flow.md",
-    "Design/frontend/UI/Layout.md",
-    "Design/frontend/UX/Interaction Patterns.md",
     "backend/app/api/websocket/__pycache__/__init__.cpython-314.pyc",
     "backend/app/api/websocket/__pycache__/manager.cpython-314.pyc",
     "backend/app/api/websocket/__pycache__/telemetry_ws.cpython-314.pyc",
@@ -212,15 +217,6 @@
     "backend/tests/__pycache__",
     "backend/app/__pycache__/__init__.cpython-314.pyc",
     "backend/app/__pycache__/main.cpython-314.pyc",
-    "backend/README.md",
-    "Design/Design Index.md",
-    "Design/editor/UX/Interaction Patterns.md",
-    "Design/editor/UX/Wireframes.md",
-    "Design/editor/UX/User Flows.md",
-    "Design/editor/UI/Layout.md",
-    "Design/editor/UI/Component Library.md",
-    "Design/editor/UI/Typography.md",
-    "Design/frontend/UI/Typography.md",
     "Untitled.canvas"
   ]
 }

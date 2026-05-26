@@ -59,14 +59,14 @@ export const HistoryTable = memo(function HistoryTable({
     isError,
   } = useInfiniteQuery({
     queryKey: ['history-table', deviceId, signal.signal_name, timeRange],
-    queryFn: async ({ pageParam }) => {
+    queryFn: async ({ pageParam, signal: abortSignal }) => {
       return telemetryApi.historyPage({
         device_id:   deviceId,
         signal_name: signal.signal_name,
         range:       timeRange,
         cursor:      pageParam ?? undefined,
         limit:       PAGE_SIZE,
-      })
+      }, abortSignal)
     },
     initialPageParam: null as number | null,
     getNextPageParam: (lastPage) => {

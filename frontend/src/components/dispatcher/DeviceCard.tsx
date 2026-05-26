@@ -1,6 +1,7 @@
 import { memo, useMemo } from 'react'
 import { motion } from 'framer-motion'
-import { Wifi, WifiOff, Clock, Server } from 'lucide-react'
+import { useNavigate, useParams } from 'react-router-dom'
+import { WifiOff, Clock, Server, Wifi, ArrowUpRight } from 'lucide-react'
 import { formatDistanceToNow } from 'date-fns'
 import { StatusBadge } from './StatusBadge'
 import { SignalRow } from './SignalRow'
@@ -27,12 +28,7 @@ export function DeviceCardSkeleton() {
   )
 }
 
-// ── Main Card ─────────────────────────────────────
-interface Props {
-  device: Device
-  index:  number
-}
-
+// ── Helpers ───────────────────────────────────────
 function getStatusGradient(status: DeviceStatus): string {
   const map: Record<DeviceStatus, string> = {
     online:  'from-[#00D68F]/8 via-transparent to-transparent',
@@ -55,12 +51,29 @@ function getStatusBorder(status: DeviceStatus): string {
   return map[status] ?? ''
 }
 
+// ── Main Card ─────────────────────────────────────
+interface Props {
+  device: Device
+  index:  number
+}
+
 export const DeviceCard = memo(function DeviceCard({ device, index }: Props) {
-  const signals         = useDispatcherStore(s => s.signals[device.id])
-  const statusInfo      = useDispatcherStore(s => s.statuses[device.id])
-  const recentlyChanged = useDispatcherStore(s => s.recentlyChanged)
+  const navigate = useNavigate()
+  const { id: substationIdParam } = useParams<{ id: string }>()
+  // ── Granular selectors: only re-render when THIS device's data changes ──
+  const signals    = useDispatcherStore(s => s.signals[device.id])
+  const statusInfo = useDispatcherStore(s => s.statuses[device.id])
+  // Subscribe to revision counter — lightweight re-render trigger
+  useDispatcherStore(s => s.revisions[device.id])
 
   const status: DeviceStatus = statusInfo?.status ?? 'unknown'
+
+  function openDetail(signalName?: string) {
+    const subId = substationIdParam ?? device.substation_id
+    const url = `/substation/${subId}/device/${device.id}` +
+                (signalName ? `?signal=${encodeURIComponent(signalName)}` : '')
+    navigate(url)
+  }
 
   const lastUpdate = useMemo(() => {
     if (!statusInfo?.updated_at) return null
@@ -76,24 +89,26 @@ export const DeviceCard = memo(function DeviceCard({ device, index }: Props) {
       .sort((a, b) => a.register_code - b.register_code)
   }, [device.signals])
 
+  const activeCount = sortedSignals.length
+  const totalCount  = device.signals?.length ?? 0
+
   return (
     <motion.div
-      layout
-      initial={{ opacity: 0, y: 24, scale: 0.97 }}
+      initial={{ opacity: 0, y: 20, scale: 0.98 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
-      exit={{ opacity: 0, y: -12, scale: 0.96 }}
       transition={{
-        delay:    index * 0.06,
-        duration: 0.4,
+        delay:    Math.min(index * 0.04, 0.3),
+        duration: 0.35,
         ease: [0.22, 1, 0.36, 1],
       }}
+      onClick={() => openDetail()}
       className={`
         glass-card gradient-border rounded-2xl overflow-hidden
-        flex flex-col select-none
+        flex flex-col select-none cursor-pointer group/card
         ${getStatusBorder(status)}
       `}
     >
-      {/* ── Header ─────────────────────────────────────── */}
+      {/* ── Header ─────────────────────────────────── */}
       <div
         className={`
           relative px-4 pt-4 pb-3
@@ -101,7 +116,7 @@ export const DeviceCard = memo(function DeviceCard({ device, index }: Props) {
           border-b border-[var(--border)]
         `}
       >
-        {/* Background glow blob */}
+        {/* Background glow */}
         <div
           className="absolute top-0 right-0 w-32 h-32 opacity-20 pointer-events-none"
           style={{
@@ -116,12 +131,13 @@ export const DeviceCard = memo(function DeviceCard({ device, index }: Props) {
 
         <div className="flex items-start justify-between gap-2 relative z-10">
           <div className="min-w-0">
-            {/* Device name */}
-            <h3 className="text-[15px] font-semibold text-[var(--text)] truncate leading-tight">
+            <h3 className="text-[15px] font-semibold text-[var(--text)] truncate leading-tight flex items-center gap-1.5">
               {device.name}
+              <ArrowUpRight
+                size={14}
+                className="text-[var(--electric)] opacity-0 -translate-x-1 group-hover/card:opacity-100 group-hover/card:translate-x-0 transition-all duration-200"
+              />
             </h3>
-
-            {/* IP address — mono */}
             <div className="flex items-center gap-1.5 mt-1">
               <Server size={10} className="text-ink-300 flex-shrink-0" />
               <code className="text-[11px] font-mono text-ink-300">
@@ -129,20 +145,22 @@ export const DeviceCard = memo(function DeviceCard({ device, index }: Props) {
               </code>
             </div>
           </div>
-
-          {/* Status badge */}
           <StatusBadge status={status} size="sm" />
         </div>
 
-        {/* Model ID badge */}
-        <div className="mt-1.5 relative z-10">
+        {/* Signal count + model */}
+        <div className="mt-1.5 relative z-10 flex items-center gap-2">
           <span className="text-[11px] text-ink-300/60 font-mono">
             model #{device.model_id}
+          </span>
+          <span className="text-ink-300/30">·</span>
+          <span className="text-[11px] text-ink-300/60">
+            {activeCount}/{totalCount} signal
           </span>
         </div>
       </div>
 
-      {/* ── Signals ────────────────────────────────────── */}
+      {/* ── Signals ────────────────────────────────── */}
       <div className="flex-1 overflow-hidden">
         {status === 'offline' && !sortedSignals.length ? (
           <div className="flex flex-col items-center justify-center py-8 gap-2">
@@ -159,25 +177,22 @@ export const DeviceCard = memo(function DeviceCard({ device, index }: Props) {
         ) : (
           <table className="w-full">
             <tbody>
-              {sortedSignals.map(sig => {
-                const key = `${device.id}:${sig.signal_name}`
-                return (
-                  <SignalRow
-                    key={sig.id}
-                    signalName={sig.signal_name}
-                    signalTitle={sig.signal_title ?? sig.signal_name}
-                    unit={sig.unit}
-                    data={signals?.[sig.signal_name]}
-                    isChanged={recentlyChanged.has(key)}
-                  />
-                )
-              })}
+              {sortedSignals.map(sig => (
+                <SignalRow
+                  key={sig.id}
+                  signalName={sig.signal_name}
+                  signalTitle={sig.signal_title ?? sig.signal_name}
+                  unit={sig.unit}
+                  data={signals?.[sig.signal_name]}
+                  onHistoryClick={() => openDetail(sig.signal_name)}
+                />
+              ))}
             </tbody>
           </table>
         )}
       </div>
 
-      {/* ── Footer ─────────────────────────────────────── */}
+      {/* ── Footer ─────────────────────────────────── */}
       <div className="px-4 py-2.5 border-t border-[var(--border)] flex items-center justify-between">
         <div className="flex items-center gap-1.5 text-ink-300">
           <Clock size={10} />

@@ -1,6 +1,15 @@
 import type { WsMessage } from '@/types'
 
-type Handler = (msg: WsMessage) => void
+/**
+ * Frame-batched WebSocket client.
+ *
+ * Instead of firing handlers on every incoming message (which causes
+ * one React re-render per message), messages are buffered and flushed
+ * once per requestAnimationFrame (~16ms). A single store update for
+ * N messages = N× fewer re-renders.
+ */
+
+type BatchHandler = (msgs: WsMessage[]) => void
 type StateHandler = (state: 'connected' | 'connecting' | 'disconnected') => void
 
 const RETRY_DELAYS = [1000, 2000, 4000, 8000, 15000]
@@ -8,12 +17,16 @@ const PING_INTERVAL = 25_000
 
 class WsClient {
   private socket: WebSocket | null = null
-  private handlers: Set<Handler> = new Set()
+  private handlers: Set<BatchHandler> = new Set()
   private stateHandlers: Set<StateHandler> = new Set()
   private retryCount = 0
   private retryTimer?: ReturnType<typeof setTimeout>
   private pingTimer?: ReturnType<typeof setInterval>
   private url = ''
+
+  // ── Frame batching ─────────────────────────────
+  private buffer: WsMessage[] = []
+  private rafId: number | null = null
 
   connect(url: string) {
     this.url = url
@@ -38,12 +51,14 @@ class WsClient {
     this.socket.onmessage = (e) => {
       try {
         const msg: WsMessage = JSON.parse(e.data)
-        this.handlers.forEach(h => h(msg))
+        this.buffer.push(msg)
+        this.scheduleFlush()
       } catch {/* ignore malformed */}
     }
 
     this.socket.onclose = () => {
       this.stopPing()
+      this.flushNow() // deliver any remaining
       this.setState('disconnected')
       this.scheduleRetry()
     }
@@ -51,6 +66,23 @@ class WsClient {
     this.socket.onerror = () => {
       this.socket?.close()
     }
+  }
+
+  /** Schedule a RAF flush (dedup — only one per frame) */
+  private scheduleFlush() {
+    if (this.rafId !== null) return
+    this.rafId = requestAnimationFrame(() => {
+      this.rafId = null
+      this.flushNow()
+    })
+  }
+
+  /** Deliver buffered messages to all handlers */
+  private flushNow() {
+    if (!this.buffer.length) return
+    const batch = this.buffer
+    this.buffer = []
+    this.handlers.forEach(h => h(batch))
   }
 
   private scheduleRetry() {
@@ -79,11 +111,20 @@ class WsClient {
     this.stateHandlers.forEach(h => h(state))
   }
 
-  subscribe(handler: Handler)        { this.handlers.add(handler);      return () => this.handlers.delete(handler) }
-  onStateChange(h: StateHandler)     { this.stateHandlers.add(h);       return () => this.stateHandlers.delete(h) }
+  subscribe(handler: BatchHandler) {
+    this.handlers.add(handler)
+    return () => this.handlers.delete(handler)
+  }
+
+  onStateChange(h: StateHandler) {
+    this.stateHandlers.add(h)
+    return () => this.stateHandlers.delete(h)
+  }
 
   disconnect() {
     this.stopPing()
+    if (this.rafId !== null) { cancelAnimationFrame(this.rafId); this.rafId = null }
+    this.flushNow()
     clearTimeout(this.retryTimer)
     this.retryTimer = undefined
     this.socket?.close()

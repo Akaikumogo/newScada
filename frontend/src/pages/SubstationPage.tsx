@@ -1,10 +1,10 @@
-import { useEffect, useState, useMemo } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useEffect, useMemo, useCallback } from 'react'
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useQuery } from '@tanstack/react-query'
 import {
   ArrowLeft, Network, LayoutGrid, BarChart2, Table2,
-  ChevronDown, Wifi, WifiOff,
+  ChevronDown, Wifi, WifiOff, Search,
 } from 'lucide-react'
 import { DeviceCard, DeviceCardSkeleton } from '@/components/dispatcher/DeviceCard'
 import { SignalChart, type TimeRange } from '@/components/dispatcher/SignalChart'
@@ -14,7 +14,16 @@ import { deviceApi, substationApi } from '@/lib/api'
 import { useDispatcherStore } from '@/store/dispatcher'
 import type { Device } from '@/types'
 
-// ── Time Range Selector ──────────────────────────
+// ── Tabs ─────────────────────────────────────────
+type Tab = 'monitoring' | 'charts' | 'table'
+
+const TABS: { value: Tab; icon: React.ElementType; label: string }[] = [
+  { value: 'monitoring', icon: LayoutGrid, label: 'Monitoring' },
+  { value: 'charts',     icon: BarChart2,  label: 'Grafiklar' },
+  { value: 'table',      icon: Table2,     label: 'Jadval' },
+]
+
+// ── Time Ranges ──────────────────────────────────
 const TIME_RANGES: { value: TimeRange; label: string }[] = [
   { value: '1h',  label: '1S' },
   { value: '6h',  label: '6S' },
@@ -26,30 +35,25 @@ function TimeRangeBar({ value, onChange }: { value: TimeRange; onChange: (v: Tim
   return (
     <div className="flex items-center gap-0.5 p-0.5 rounded-lg bg-[var(--bg-card)] border border-[var(--border)]">
       {TIME_RANGES.map(r => (
-        <motion.button
+        <button
           key={r.value}
           onClick={() => onChange(r.value)}
           className={`
             relative px-3 h-7 rounded-md text-[12px] font-medium transition-colors
-            ${value === r.value ? 'text-white' : 'text-ink-300 hover:text-[var(--text)]'}
+            ${value === r.value
+              ? 'text-white bg-[var(--electric)]'
+              : 'text-ink-300 hover:text-[var(--text)]'
+            }
           `}
-          whileTap={{ scale: 0.96 }}
         >
-          {value === r.value && (
-            <motion.div
-              layoutId="time-range-active"
-              className="absolute inset-0 rounded-md bg-[var(--electric)]"
-              transition={{ type: 'spring', stiffness: 400, damping: 30 }}
-            />
-          )}
-          <span className="relative z-10">{r.label}</span>
-        </motion.button>
+          {r.label}
+        </button>
       ))}
     </div>
   )
 }
 
-// ── Device Selector ───────────────────────────────
+// ── Device Selector ──────────────────────────────
 function DeviceSelector({
   devices, selectedId, onChange,
 }: {
@@ -57,7 +61,6 @@ function DeviceSelector({
   selectedId: number | null
   onChange: (id: number) => void
 }) {
-
   return (
     <div className="relative">
       <select
@@ -86,21 +89,20 @@ function DeviceSelector({
   )
 }
 
-// ── Tab Button ────────────────────────────────────
+// ── Tab Button ───────────────────────────────────
 function TabButton({
   active, icon: Icon, label, count, onClick,
 }: {
   active: boolean; icon: React.ElementType; label: string; count?: number; onClick: () => void
 }) {
   return (
-    <motion.button
+    <button
       onClick={onClick}
       className={`
         relative flex items-center gap-2 px-4 h-10 text-[13px] font-medium
         transition-colors duration-150
         ${active ? 'text-[var(--electric-light)]' : 'text-ink-300 hover:text-[var(--text)]'}
       `}
-      whileTap={{ scale: 0.97 }}
     >
       <Icon size={14} />
       <span>{label}</span>
@@ -112,8 +114,6 @@ function TabButton({
           {count}
         </span>
       )}
-
-      {/* Bottom active bar */}
       {active && (
         <motion.div
           layoutId="tab-indicator"
@@ -121,112 +121,150 @@ function TabButton({
           transition={{ type: 'spring', stiffness: 400, damping: 30 }}
         />
       )}
-    </motion.button>
+    </button>
   )
 }
 
 // ════════════════════════════════════════════════════
-//  Main Page
+//  SubstationPage — with URL query params
 // ════════════════════════════════════════════════════
-type Tab = 'monitoring' | 'charts' | 'table'
-
+//
+//  URL format: /substation/:id?tab=charts&device=12&range=6h&q=search
+//
+//  All filter state persists in the URL:
+//   • tab       → monitoring | charts | table
+//   • device    → selected device ID
+//   • range     → 1h | 6h | 24h | 7d
+//   • q         → device search query (monitoring tab)
+//
 export function SubstationPage() {
   const { id }         = useParams<{ id: string }>()
   const substationId   = Number(id)
   const navigate       = useNavigate()
+  const [searchParams, setSearchParams] = useSearchParams()
   const statuses       = useDispatcherStore(s => s.statuses)
   const selectSubstation = useDispatcherStore(s => s.selectSubstation)
 
-  const [tab,           setTab]          = useState<Tab>('monitoring')
-  const [timeRange,     setTimeRange]    = useState<TimeRange>('1h')
-  const [selectedDevice, setSelectedDevice] = useState<number | null>(null)
+  // ── Read state from URL ────────────────────────
+  const tab            = (searchParams.get('tab') as Tab) || 'monitoring'
+  const timeRange      = (searchParams.get('range') as TimeRange) || '1h'
+  const selectedDevice = searchParams.has('device') ? Number(searchParams.get('device')) : null
+  const searchQuery    = searchParams.get('q') || ''
+
+  // ── URL updaters (replace: true → no history spam) ──
+  const updateParam = useCallback((key: string, value: string | null) => {
+    setSearchParams(prev => {
+      if (value === null || value === '') {
+        prev.delete(key)
+      } else {
+        prev.set(key, value)
+      }
+      return prev
+    }, { replace: true })
+  }, [setSearchParams])
+
+  const setTab = useCallback((t: Tab) => {
+    updateParam('tab', t === 'monitoring' ? null : t)
+  }, [updateParam])
+
+  const setTimeRange = useCallback((r: TimeRange) => {
+    updateParam('range', r === '1h' ? null : r)
+  }, [updateParam])
+
+  const setSelectedDevice = useCallback((id: number) => {
+    updateParam('device', String(id))
+  }, [updateParam])
+
+  const setSearchQuery = useCallback((q: string) => {
+    updateParam('q', q || null)
+  }, [updateParam])
 
   // Sync selected substation to store
   useEffect(() => {
     selectSubstation(substationId)
   }, [substationId, selectSubstation])
 
-  // Fetch substation info
+  // ── API Queries ────────────────────────────────
   const { data: substation } = useQuery({
-    queryKey: ['substation-info', substationId],
-    queryFn:  () => substationApi.list().then(list => list.find(s => s.id === substationId)),
+    queryKey: ['substation', substationId],
+    queryFn:  ({ signal }) => substationApi.getById(substationId, signal),
     enabled:  !!substationId,
+    staleTime: 5 * 60_000,
   })
 
-  // Fetch devices + their signals
   const { data: devices = [], isLoading } = useQuery({
     queryKey: ['devices', substationId],
-    queryFn:  () => deviceApi.list(substationId),
+    queryFn:  ({ signal }) => deviceApi.list(substationId, signal),
     enabled:  !!substationId,
     staleTime: 60_000,
   })
 
-  // Auto-select first device for charts when devices load
+  // Auto-select first device for charts/table when devices load
   useEffect(() => {
-    if (devices.length && selectedDevice === null) {
+    if (devices.length && selectedDevice === null && tab !== 'monitoring') {
       setSelectedDevice(devices[0].id)
     }
-  }, [devices, selectedDevice])
+  }, [devices, selectedDevice, tab, setSelectedDevice])
 
-  // Online stats
+  // ── Computed values ────────────────────────────
   const { onlineCount, offlineCount } = useMemo(() => {
     const online  = devices.filter(d => statuses[d.id]?.status === 'online').length
     const offline = devices.filter(d => statuses[d.id]?.status === 'offline').length
     return { onlineCount: online, offlineCount: offline }
   }, [devices, statuses])
 
-  // Selected device for charts
-  const chartDevice = devices.find(d => d.id === selectedDevice)
-  const chartSignals = (chartDevice?.signals ?? []).filter(s => s.active || s.only_realtime)
+  // Filter devices by search query (monitoring tab)
+  const filteredDevices = useMemo(() => {
+    if (!searchQuery.trim()) return devices
+    const needle = searchQuery.toLowerCase()
+    return devices.filter(d =>
+      d.name.toLowerCase().includes(needle) ||
+      d.iec104_host.includes(needle) ||
+      d.signals?.some(s =>
+        s.signal_name.toLowerCase().includes(needle) ||
+        (s.signal_title ?? '').toLowerCase().includes(needle)
+      )
+    )
+  }, [devices, searchQuery])
+
+  const chartDevice  = devices.find(d => d.id === selectedDevice)
+  const chartSignals = useMemo(() =>
+    (chartDevice?.signals ?? []).filter(s => s.active || s.only_realtime),
+    [chartDevice?.signals]
+  )
 
   return (
     <div className="flex flex-col h-[calc(100vh-56px)] overflow-hidden">
 
-      {/* ── Page Header ──────────────────────────────── */}
-      <motion.div
+      {/* ── Page Header ────────────────────────────── */}
+      <div
         className="
           flex-shrink-0 px-6 pt-5 pb-0
           border-b border-[var(--border)]
           bg-[var(--bg-base)]/80 backdrop-blur-sm
         "
-        initial={{ opacity: 0, y: -8 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.3 }}
       >
         {/* Top row */}
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-3">
-            <motion.button
+            <button
               onClick={() => navigate('/')}
               className="
                 w-8 h-8 rounded-full flex items-center justify-center
                 bg-[var(--bg-card)] border border-[var(--border)]
                 text-ink-200 hover:text-[var(--text)] hover:border-[var(--border-hover)]
-                transition-all
+                transition-all active:scale-95
               "
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
             >
               <ArrowLeft size={14} />
-            </motion.button>
+            </button>
 
             <div>
-              <motion.h1
-                className="text-[18px] font-semibold text-[var(--text)] leading-tight"
-                initial={{ opacity: 0, x: -6 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: 0.08 }}
-              >
+              <h1 className="text-[18px] font-semibold text-[var(--text)] leading-tight">
                 {substation?.name ?? 'Podstansiya'}
-              </motion.h1>
+              </h1>
 
-              {/* Online/offline stats */}
-              <motion.div
-                className="flex items-center gap-3 mt-0.5"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ delay: 0.15 }}
-              >
+              <div className="flex items-center gap-3 mt-0.5">
                 {!isLoading && (
                   <>
                     <div className="flex items-center gap-1.5">
@@ -245,67 +283,75 @@ export function SubstationPage() {
                     <span className="text-[12px] text-ink-300">{devices.length} ta qurilma</span>
                   </>
                 )}
-              </motion.div>
+              </div>
             </div>
           </div>
 
           {/* Right actions */}
           <div className="flex items-center gap-2">
-            <motion.button
+            {/* Search (monitoring tab) */}
+            {tab === 'monitoring' && (
+              <div className="relative">
+                <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-300" />
+                <input
+                  value={searchQuery}
+                  onChange={e => setSearchQuery(e.target.value)}
+                  placeholder="Qurilma qidirish..."
+                  className="
+                    h-8 w-[200px] pl-9 pr-3 rounded-lg
+                    bg-[var(--bg-card)] border border-[var(--border)]
+                    text-[12px] text-[var(--text)] placeholder:text-ink-300/40
+                    focus:outline-none focus:ring-1 focus:ring-[var(--electric)]/40
+                    transition-all focus:w-[260px]
+                  "
+                />
+              </div>
+            )}
+
+            <button
               onClick={() => navigate(`/substation/${substationId}/schema`)}
               className="
                 flex items-center gap-1.5 h-8 px-3 rounded-lg
                 text-[12px] font-medium text-ink-200
                 hover:text-[var(--text)] bg-[var(--bg-card)]
                 border border-[var(--border)] hover:border-[var(--border-hover)]
-                transition-all
+                transition-all active:scale-[0.97]
               "
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.97 }}
             >
               <Network size={13} />
               Sxema
-            </motion.button>
+            </button>
           </div>
         </div>
 
         {/* Tab bar */}
         <div className="flex items-center gap-1">
-          <TabButton
-            active={tab === 'monitoring'}
-            icon={LayoutGrid}
-            label="Monitoring"
-            count={devices.length}
-            onClick={() => setTab('monitoring')}
-          />
-          <TabButton
-            active={tab === 'charts'}
-            icon={BarChart2}
-            label="Grafiklar"
-            onClick={() => setTab('charts')}
-          />
-          <TabButton
-            active={tab === 'table'}
-            icon={Table2}
-            label="Jadval"
-            onClick={() => setTab('table')}
-          />
+          {TABS.map(t => (
+            <TabButton
+              key={t.value}
+              active={tab === t.value}
+              icon={t.icon}
+              label={t.label}
+              count={t.value === 'monitoring' ? devices.length : undefined}
+              onClick={() => setTab(t.value)}
+            />
+          ))}
         </div>
-      </motion.div>
+      </div>
 
-      {/* ── Content ──────────────────────────────────── */}
+      {/* ── Content ────────────────────────────────── */}
       <div className="flex-1 overflow-y-auto">
         <AnimatePresence mode="wait">
 
-          {/* ── MONITORING TAB ──────────────────────── */}
+          {/* ── MONITORING TAB ──────────────────── */}
           {tab === 'monitoring' && (
             <motion.div
               key="monitoring"
               className="p-6"
-              initial={{ opacity: 0, y: 8 }}
+              initial={{ opacity: 0, y: 6 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -4 }}
-              transition={{ duration: 0.25 }}
+              transition={{ duration: 0.2 }}
             >
               {isLoading ? (
                 <div
@@ -314,14 +360,21 @@ export function SubstationPage() {
                 >
                   {Array.from({ length: 6 }).map((_, i) => <DeviceCardSkeleton key={i} />)}
                 </div>
-              ) : devices.length === 0 ? (
+              ) : filteredDevices.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-24 gap-4">
                   <div className="w-16 h-16 rounded-2xl bg-[var(--bg-card)] border border-[var(--border)] flex items-center justify-center">
                     <LayoutGrid size={28} className="text-ink-300/40" />
                   </div>
                   <div className="text-center">
-                    <p className="text-[15px] font-medium text-[var(--text)]">Qurilmalar yo'q</p>
-                    <p className="text-[13px] text-ink-300 mt-1">Editor da qurilma qo'shing</p>
+                    <p className="text-[15px] font-medium text-[var(--text)]">
+                      {searchQuery ? 'Natija topilmadi' : 'Qurilmalar yo\'q'}
+                    </p>
+                    <p className="text-[13px] text-ink-300 mt-1">
+                      {searchQuery
+                        ? `"${searchQuery}" bo'yicha qurilma topilmadi`
+                        : 'Editor da qurilma qo\'shing'
+                      }
+                    </p>
                   </div>
                 </div>
               ) : (
@@ -329,7 +382,7 @@ export function SubstationPage() {
                   className="grid gap-4"
                   style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))' }}
                 >
-                  {devices.map((device, i) => (
+                  {filteredDevices.map((device, i) => (
                     <DeviceCard key={device.id} device={device} index={i} />
                   ))}
                 </div>
@@ -337,23 +390,21 @@ export function SubstationPage() {
             </motion.div>
           )}
 
-          {/* ── CHARTS TAB ───────────────────────────── */}
+          {/* ── CHARTS TAB ──────────────────────── */}
           {tab === 'charts' && (
             <motion.div
               key="charts"
               className="p-6 flex flex-col gap-5"
-              initial={{ opacity: 0, y: 8 }}
+              initial={{ opacity: 0, y: 6 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -4 }}
-              transition={{ duration: 0.25 }}
+              transition={{ duration: 0.2 }}
             >
-              {/* Controls */}
               <div className="flex items-center justify-between gap-4 flex-wrap">
                 <div className="flex items-center gap-3">
                   <BarChart2 size={16} className="text-[var(--electric)]" />
                   <span className="text-[14px] font-medium text-[var(--text)]">Signal tarixi</span>
                 </div>
-
                 <div className="flex items-center gap-3">
                   <DeviceSelector
                     devices={devices}
@@ -364,13 +415,8 @@ export function SubstationPage() {
                 </div>
               </div>
 
-              {/* Device status (small) */}
               {chartDevice && (
-                <motion.div
-                  className="flex items-center gap-3 p-3 rounded-xl bg-[var(--bg-card)] border border-[var(--border)]"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                >
+                <div className="flex items-center gap-3 p-3 rounded-xl bg-[var(--bg-card)] border border-[var(--border)]">
                   <StatusBadge status={statuses[chartDevice.id]?.status ?? 'unknown'} size="sm" />
                   <code className="text-[11px] font-mono text-ink-300">
                     {chartDevice.iec104_host}:{chartDevice.iec104_port} · CASDU {chartDevice.iec104_common_address}
@@ -378,10 +424,9 @@ export function SubstationPage() {
                   <span className="text-[11px] text-ink-300">
                     · {chartSignals.length} ta signal
                   </span>
-                </motion.div>
+                </div>
               )}
 
-              {/* Charts grid */}
               {isLoading || !chartDevice ? (
                 <div className="grid gap-4" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(440px, 1fr))' }}>
                   {Array.from({ length: 4 }).map((_, i) => (
@@ -419,23 +464,21 @@ export function SubstationPage() {
             </motion.div>
           )}
 
-          {/* ── TABLE TAB ────────────────────────── */}
+          {/* ── TABLE TAB ───────────────────────── */}
           {tab === 'table' && (
             <motion.div
               key="table"
               className="p-6 flex flex-col gap-5"
-              initial={{ opacity: 0, y: 8 }}
+              initial={{ opacity: 0, y: 6 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -4 }}
-              transition={{ duration: 0.25 }}
+              transition={{ duration: 0.2 }}
             >
-              {/* Controls */}
               <div className="flex items-center justify-between gap-4 flex-wrap">
                 <div className="flex items-center gap-3">
                   <Table2 size={16} className="text-[var(--electric)]" />
                   <span className="text-[14px] font-medium text-[var(--text)]">Signal jadvali</span>
                 </div>
-
                 <div className="flex items-center gap-3">
                   <DeviceSelector
                     devices={devices}
@@ -446,13 +489,8 @@ export function SubstationPage() {
                 </div>
               </div>
 
-              {/* Device status */}
               {chartDevice && (
-                <motion.div
-                  className="flex items-center gap-3 p-3 rounded-xl bg-[var(--bg-card)] border border-[var(--border)]"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                >
+                <div className="flex items-center gap-3 p-3 rounded-xl bg-[var(--bg-card)] border border-[var(--border)]">
                   <StatusBadge status={statuses[chartDevice.id]?.status ?? 'unknown'} size="sm" />
                   <code className="text-[11px] font-mono text-ink-300">
                     {chartDevice.iec104_host}:{chartDevice.iec104_port} · CASDU {chartDevice.iec104_common_address}
@@ -460,10 +498,9 @@ export function SubstationPage() {
                   <span className="text-[11px] text-ink-300">
                     · {chartSignals.length} ta signal
                   </span>
-                </motion.div>
+                </div>
               )}
 
-              {/* Table grid */}
               {isLoading || !chartDevice ? (
                 <div className="grid gap-4" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(500px, 1fr))' }}>
                   {Array.from({ length: 3 }).map((_, i) => (

@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState, memo } from 'react'
-import { motion } from 'framer-motion'
 import { ChevronRight } from 'lucide-react'
 import type { SignalValue } from '@/types'
 
@@ -8,7 +7,6 @@ interface Props {
   signalTitle: string
   unit:        string
   data:        SignalValue | undefined
-  isChanged:   boolean
   onHistoryClick?: () => void
 }
 
@@ -22,76 +20,113 @@ function QualityDot({ quality }: { quality: number }) {
   )
 }
 
+/**
+ * Animated number display — smooth value transitions.
+ * Uses CSS transition on opacity for flash, requestAnimationFrame
+ * for value interpolation (12 steps @ 16ms = ~200ms).
+ */
 function AnimatedNumber({ value }: { value: number | null }) {
   const prevRef  = useRef<number | null>(null)
   const [display, setDisplay] = useState(value)
+  const rafRef = useRef(0)
 
   useEffect(() => {
-    if (value === null) { setDisplay(null); return }
-    if (prevRef.current === null) { setDisplay(value); prevRef.current = value; return }
+    if (value === null) { setDisplay(null); prevRef.current = null; return }
+    if (prevRef.current === null || prevRef.current === value) {
+      setDisplay(value)
+      prevRef.current = value
+      return
+    }
 
-    const start  = prevRef.current
-    const end    = value
-    const diff   = end - start
-    const steps  = 12
-    let step     = 0
+    const start = prevRef.current
+    const end   = value
+    const diff  = end - start
+    const steps = 10
+    let step    = 0
+    const startTime = performance.now()
+    const duration  = 160 // ms
 
-    const timer = setInterval(() => {
+    function animate() {
       step++
-      const progress = step / steps
-      const eased = 1 - Math.pow(1 - progress, 3) // ease-out cubic
+      const elapsed  = performance.now() - startTime
+      const progress = Math.min(elapsed / duration, 1)
+      const eased    = 1 - Math.pow(1 - progress, 3) // ease-out cubic
       setDisplay(start + diff * eased)
-      if (step >= steps) {
-        clearInterval(timer)
+
+      if (progress < 1 && step < steps) {
+        rafRef.current = requestAnimationFrame(animate)
+      } else {
         setDisplay(end)
       }
-    }, 16)
+    }
 
+    rafRef.current = requestAnimationFrame(animate)
     prevRef.current = value
-    return () => clearInterval(timer)
+
+    return () => cancelAnimationFrame(rafRef.current)
   }, [value])
 
   if (display === null) return <span className="text-ink-300">—</span>
 
-  const abs = Math.abs(display)
-  let formatted: string
-  if (abs === 0)         formatted = '0'
-  else if (abs >= 1000)  formatted = display.toFixed(1)
-  else if (abs >= 100)   formatted = display.toFixed(2)
-  else if (abs >= 10)    formatted = display.toFixed(3)
-  else if (abs >= 1)     formatted = display.toFixed(3)
-  else if (abs >= 0.1)   formatted = display.toFixed(4)
-  else if (abs >= 0.01)  formatted = display.toFixed(5)
-  else if (abs >= 0.001) formatted = display.toFixed(6)
-  else                   formatted = display.toExponential(2)
-
-  return <span>{formatted}</span>
+  return <span>{formatNumber(display)}</span>
 }
 
-export const SignalRow = memo(function SignalRow({
-  signalName, signalTitle, unit, data, isChanged, onHistoryClick,
-}: Props) {
-  const [flashing, setFlashing] = useState(false)
+function formatNumber(v: number): string {
+  if (v === 0) return '0'
+  const abs = Math.abs(v)
+  if (abs >= 1000)  return v.toFixed(1)
+  if (abs >= 100)   return v.toFixed(2)
+  if (abs >= 10)    return v.toFixed(3)
+  if (abs >= 1)     return v.toFixed(3)
+  if (abs >= 0.1)   return v.toFixed(4)
+  if (abs >= 0.01)  return v.toFixed(5)
+  if (abs >= 0.001) return v.toFixed(6)
+  return v.toExponential(2)
+}
 
+/**
+ * SignalRow — self-contained flash detection.
+ *
+ * Instead of subscribing to a global `recentlyChanged` Map (which
+ * caused ALL cards to re-render on every signal change), each row
+ * detects value changes locally via useRef. Flash only affects THIS row.
+ */
+export const SignalRow = memo(function SignalRow({
+  signalName, signalTitle, unit, data, onHistoryClick,
+}: Props) {
+  const prevValueRef = useRef<number | null | undefined>(undefined)
+  const [flashing, setFlashing]   = useState(false)
+
+  // Detect value change locally — no global subscription needed
   useEffect(() => {
-    if (isChanged) {
+    const curr = data?.value
+    const prev = prevValueRef.current
+
+    // First render or no data — just store
+    if (prev === undefined) {
+      prevValueRef.current = curr ?? null
+      return
+    }
+
+    // Value actually changed → flash
+    if (curr !== undefined && curr !== null && curr !== prev) {
       setFlashing(true)
-      const t = setTimeout(() => setFlashing(false), 1300)
+      const t = setTimeout(() => setFlashing(false), 1200)
+      prevValueRef.current = curr
       return () => clearTimeout(t)
     }
-  }, [isChanged, data?.value])
+
+    prevValueRef.current = curr ?? null
+  }, [data?.value])
 
   return (
-    <motion.tr
-      layout
+    <tr
       className={`
         group border-b border-[var(--border)] last:border-0
         cursor-pointer transition-colors duration-150
         ${flashing ? 'signal-flash' : 'hover:bg-[var(--bg-subtle)]/40'}
       `}
-      onClick={onHistoryClick}
-      whileHover={{ x: 2 }}
-      transition={{ type: 'spring', stiffness: 600, damping: 30 }}
+      onClick={onHistoryClick ? (e) => { e.stopPropagation(); onHistoryClick() } : undefined}
     >
       {/* Signal short name */}
       <td className="py-2 pl-4 pr-2 w-14">
@@ -110,7 +145,7 @@ export const SignalRow = memo(function SignalRow({
         </span>
       </td>
 
-      {/* Unit (from signal definition) */}
+      {/* Unit */}
       <td className="py-2 pr-2 w-10">
         <span className="text-[11px] text-ink-300">{unit}</span>
       </td>
@@ -127,6 +162,6 @@ export const SignalRow = memo(function SignalRow({
           className="text-ink-300 opacity-0 group-hover:opacity-100 transition-opacity"
         />
       </td>
-    </motion.tr>
+    </tr>
   )
 })

@@ -14,6 +14,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import settings
 from app.application.services.record_collector import record_collector
+from app.application.services.ping_monitor import ping_monitor
 from app.infrastructure.db.database import create_tables
 from app.infrastructure.cache.redis_cache import close_redis, init_redis, is_redis_available
 
@@ -74,6 +75,12 @@ async def lifespan(app: FastAPI):
     else:
         logger.info("IEC104 record collector disabled")
 
+    if settings.PING_MONITOR_ENABLED:
+        logger.info("Starting Ping monitor (online/offline)")
+        ping_monitor.start()
+    else:
+        logger.info("Ping monitor disabled")
+
     logger.info("▶ Backend tayyor")
 
     yield  # ← application runs here
@@ -81,6 +88,7 @@ async def lifespan(app: FastAPI):
     # ── shutdown ──
     logger.info("◀ Shutdown …")
     await record_collector.stop()
+    await ping_monitor.stop()
     await close_redis()
     logger.info("◀ Shutdown complete")
 

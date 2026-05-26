@@ -1,15 +1,31 @@
-import type { Branch, Substation, Device } from '@/types'
+import type { Branch, Substation, Device, LiveDeviceData } from '@/types'
 
 const BASE = '/api'
 
-async function request<T>(url: string, init?: RequestInit): Promise<T> {
+// ── Typed API Error ──────────────────────────────
+export class ApiError extends Error {
+  constructor(
+    public readonly status: number,
+    public readonly detail: string,
+    public readonly raw?: unknown,
+  ) {
+    super(detail)
+    this.name = 'ApiError'
+  }
+}
+
+// ── Core request ─────────────────────────────────
+async function request<T>(
+  url: string,
+  init?: RequestInit,
+): Promise<T> {
   const res = await fetch(`${BASE}${url}`, {
     headers: { 'Content-Type': 'application/json', ...init?.headers },
     ...init,
   })
   if (!res.ok) {
     const body = await res.json().catch(() => ({}))
-    throw new Error(body?.detail ?? `HTTP ${res.status}`)
+    throw new ApiError(res.status, body?.detail ?? `HTTP ${res.status}`, body)
   }
   return res.json()
 }
@@ -19,23 +35,38 @@ interface Paginated<T> { items: T[]; total: number }
 
 // ── Branches ──────────────────────────────────────
 export const branchApi = {
-  list: () => request<Paginated<Branch>>('/branches').then(r => r.items),
+  list: (signal?: AbortSignal) =>
+    request<Paginated<Branch>>('/branches', { signal }).then(r => r.items),
 }
 
 // ── Substations ───────────────────────────────────
 export const substationApi = {
-  list: (branchId?: number) =>
-    request<Paginated<Substation>>(`/substations${branchId ? `?branch_id=${branchId}` : ''}`).then(r => r.items),
-  getSchema: (id: number) =>
-    request<{ canvas_json: object } | null>(`/substations/${id}/schema`),
+  list: (branchId?: number, signal?: AbortSignal) =>
+    request<Paginated<Substation>>(
+      `/substations${branchId ? `?branch_id=${branchId}` : ''}`,
+      { signal },
+    ).then(r => r.items),
+
+  getById: (id: number, signal?: AbortSignal) =>
+    request<Substation>(`/substations/${id}`, { signal }),
+
+  getSchema: (id: number, signal?: AbortSignal) =>
+    request<{ canvas_json: object } | null>(`/substations/${id}/schema`, { signal }),
 }
 
 // ── Devices ───────────────────────────────────────
 export const deviceApi = {
-  list:    (substationId: number) =>
-    request<Paginated<Device>>(`/devices?substation_id=${substationId}`).then(r => r.items),
-  listAll: () => request<Paginated<Device>>('/devices').then(r => r.items),
-  getById: (id: number) => request<Device>(`/devices/${id}`),
+  list: (substationId: number, signal?: AbortSignal) =>
+    request<Paginated<Device>>(
+      `/devices?substation_id=${substationId}`,
+      { signal },
+    ).then(r => r.items),
+
+  listAll: (signal?: AbortSignal) =>
+    request<Paginated<Device>>('/devices', { signal }).then(r => r.items),
+
+  getById: (id: number, signal?: AbortSignal) =>
+    request<Device>(`/devices/${id}`, { signal }),
 }
 
 // ── Telemetry ─────────────────────────────────────
@@ -50,34 +81,130 @@ export interface HistoryPoint {
   captured_at: string
 }
 
-export const telemetryApi = {
-  /** Latest live values for a substation (REST fallback, WS is primary) */
-  live: (substationId: number) =>
-    request<Array<{
-      device_id: number
-      online:    boolean
-      last_seen: string | null
-      signals:   Array<{ signal_name: string; value: number | null; quality: number; ts: string | null }>
-    }>>(`/telemetry/live?substation_id=${substationId}`),
+/** Aggregated OHLC-like bucket from /telemetry/range */
+export interface RangePoint {
+  ts:    string  // ISO timestamp
+  open:  number
+  high:  number
+  low:   number
+  close: number
+  avg:   number
+  count: number
+}
 
-  /** Historical records for a single signal */
-  history: (params: {
-    device_id:   number
-    signal_name: string
-    range:       HistoryRange
-  }) =>
-    request<HistoryPoint[]>(
-      `/telemetry/history?device_id=${params.device_id}&signal_name=${encodeURIComponent(params.signal_name)}&range=${params.range}`
+export const telemetryApi = {
+  /** Latest live values (REST fallback, WS is primary) */
+  live: (substationId?: number, signal?: AbortSignal) =>
+    request<LiveDeviceData[]>(
+      `/telemetry/live${substationId ? `?substation_id=${substationId}` : ''}`,
+      { signal },
     ),
 
-  /** Paginated history — infinite scroll uchun (yangi → eski) */
-  historyPage: (params: {
-    device_id:   number
-    signal_name: string
-    range:       HistoryRange
-    cursor?:     number
-    limit?:      number
-  }) => {
+  /** Historical records for a single signal */
+  history: (
+    params: { device_id: number; signal_name: string; range: HistoryRange },
+    signal?: AbortSignal,
+  ) =>
+    request<HistoryPoint[]>(
+      `/telemetry/history?device_id=${params.device_id}&signal_name=${encodeURIComponent(params.signal_name)}&range=${params.range}`,
+      { signal },
+    ),
+
+  /** Custom-range query with adaptive bucketing — for trading-style charts */
+  range: (
+    params: {
+      device_id:      number
+      signal_name:    string
+      from_ts:        Date | string
+      to_ts:          Date | string
+      target_points?: number
+    },
+    signal?: AbortSignal,
+  ) => {
+    const qs = new URLSearchParams({
+      device_id:   String(params.device_id),
+      signal_name: params.signal_name,
+      from_ts:     params.from_ts instanceof Date ? params.from_ts.toISOString() : params.from_ts,
+      to_ts:       params.to_ts   instanceof Date ? params.to_ts.toISOString()   : params.to_ts,
+    })
+    if (params.target_points) qs.set('target_points', String(params.target_points))
+    return request<RangePoint[]>(`/telemetry/range?${qs}`, { signal })
+  },
+
+  /**
+   * Diff — same signal_title across multiple devices.
+   * Each device may have its own signal_name for that title — backend
+   * resolves the mapping via device_signal table.
+   *
+   * Returns { device_id: RangePoint[] }
+   */
+  diff: (
+    params: {
+      signal_title:   string
+      from_ts:        Date | string
+      to_ts:          Date | string
+      target_points?: number
+    },
+    signal?: AbortSignal,
+  ) => {
+    const qs = new URLSearchParams()
+    qs.set('signal_title', params.signal_title)
+    qs.set('from_ts',      params.from_ts instanceof Date ? params.from_ts.toISOString() : params.from_ts)
+    qs.set('to_ts',        params.to_ts   instanceof Date ? params.to_ts.toISOString()   : params.to_ts)
+    if (params.target_points) qs.set('target_points', String(params.target_points))
+    return request<Record<string, RangePoint[]>>(`/telemetry/diff?${qs}`, { signal })
+  },
+
+  /** List signal_titles available for diffing (present on >= min_devices) */
+  diffSignals: (minDevices = 2, signal?: AbortSignal) => {
+    const qs = new URLSearchParams()
+    qs.set('min_devices', String(minDevices))
+    return request<Array<{
+      signal_title:  string
+      device_count:  number
+      unit:          string | null
+      sample_names:  string[]
+    }>>(`/telemetry/diff/signals?${qs}`, { signal })
+  },
+
+  /**
+   * Batch range — all (or subset of) signals for a device, in one request.
+   *
+   * If `signal_names` is omitted, the backend auto-resolves to all
+   * active/realtime signals for the given device_id (saves URL space).
+   */
+  rangeMulti: (
+    params: {
+      device_id:      number
+      signal_names?:  string[]
+      from_ts:        Date | string
+      to_ts:          Date | string
+      target_points?: number
+    },
+    signal?: AbortSignal,
+  ) => {
+    const qs = new URLSearchParams()
+    qs.set('device_id', String(params.device_id))
+    qs.set('from_ts',   params.from_ts instanceof Date ? params.from_ts.toISOString() : params.from_ts)
+    qs.set('to_ts',     params.to_ts   instanceof Date ? params.to_ts.toISOString()   : params.to_ts)
+    if (params.target_points) qs.set('target_points', String(params.target_points))
+    if (params.signal_names) {
+      for (const name of params.signal_names) qs.append('signal_name', name)
+    }
+    return request<Record<string, RangePoint[]>>(`/telemetry/range/multi?${qs}`, { signal })
+  },
+
+  /** Cursor-based history page — infinite scroll */
+  historyPage: (
+    params: {
+      device_id:   number
+      signal_name: string
+      range:       HistoryRange
+      cursor?:     number
+      limit?:      number
+    },
+    signal?: AbortSignal,
+  ) => {
     const qs = new URLSearchParams({
       device_id:   String(params.device_id),
       signal_name: params.signal_name,
@@ -85,6 +212,6 @@ export const telemetryApi = {
     })
     if (params.cursor != null) qs.set('cursor', String(params.cursor))
     if (params.limit  != null) qs.set('limit',  String(params.limit))
-    return request<HistoryPoint[]>(`/telemetry/history/page?${qs}`)
+    return request<HistoryPoint[]>(`/telemetry/history/page?${qs}`, { signal })
   },
 }

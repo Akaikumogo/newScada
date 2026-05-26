@@ -172,11 +172,11 @@ export const SignalChart = memo(function SignalChart({
 
   const { data = [], isLoading, isError } = useQuery({
     queryKey: ['history', deviceId, signal.signal_name, timeRange],
-    queryFn:  () => telemetryApi.history({
+    queryFn:  ({ signal: abortSignal }) => telemetryApi.history({
       device_id:   deviceId,
       signal_name: signal.signal_name,
       range:       timeRange,
-    }),
+    }, abortSignal),
     staleTime: 60_000,
     refetchInterval: timeRange === '1h' ? 30_000 : 120_000,
   })

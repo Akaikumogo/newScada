@@ -66,6 +66,18 @@ export interface DeviceStatusInfo {
   updated_at: string
 }
 
+export interface LiveDeviceData {
+  device_id: number
+  online: boolean
+  last_seen: string | null
+  signals: Array<{
+    signal_name: string
+    value: number | null
+    quality: number
+    ts: string | null
+  }>
+}
+
 // ── WebSocket messages from backend ──────────────
 
 export type WsMessage =
