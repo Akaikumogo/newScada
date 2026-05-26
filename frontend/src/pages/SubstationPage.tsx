@@ -10,7 +10,7 @@ import { DeviceCard, DeviceCardSkeleton } from '@/components/dispatcher/DeviceCa
 import { SignalChart, type TimeRange } from '@/components/dispatcher/SignalChart'
 import { HistoryTable } from '@/components/dispatcher/HistoryTable'
 import { StatusBadge } from '@/components/dispatcher/StatusBadge'
-import { deviceApi, substationApi } from '@/lib/api'
+import { deviceApi, substationApi, telemetryApi } from '@/lib/api'
 import { useDispatcherStore } from '@/store/dispatcher'
 import type { Device } from '@/types'
 
@@ -144,6 +144,7 @@ export function SubstationPage() {
   const [searchParams, setSearchParams] = useSearchParams()
   const statuses       = useDispatcherStore(s => s.statuses)
   const selectSubstation = useDispatcherStore(s => s.selectSubstation)
+  const hydrateLiveSnapshot = useDispatcherStore(s => s.hydrateLiveSnapshot)
 
   // ── Read state from URL ────────────────────────
   const tab            = (searchParams.get('tab') as Tab) || 'monitoring'
@@ -198,6 +199,18 @@ export function SubstationPage() {
     enabled:  !!substationId,
     staleTime: 60_000,
   })
+
+  const { data: liveData = [] } = useQuery({
+    queryKey: ['telemetry-live', substationId],
+    queryFn:  ({ signal }) => telemetryApi.live(substationId, signal),
+    enabled:  !!substationId,
+    staleTime: 30_000,
+    refetchInterval: 30_000,
+  })
+
+  useEffect(() => {
+    if (liveData.length) hydrateLiveSnapshot(liveData)
+  }, [liveData, hydrateLiveSnapshot])
 
   // Auto-select first device for charts/table when devices load
   useEffect(() => {

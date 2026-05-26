@@ -8,7 +8,7 @@ const STATUS_MAP: Record<DeviceStatus, {
   bg: string
   pulse: boolean
 }> = {
-  online:  { label: 'Online',  color: 'text-[#00D68F]', dotColor: 'bg-[#00D68F]', bg: 'bg-[#00D68F]/10', pulse: true  },
+  online:  { label: 'Online',  color: 'text-[#00D68F]', dotColor: 'bg-[#00D68F]', bg: 'bg-[#00D68F]/10', pulse: false },
   offline: { label: 'Offline', color: 'text-[#FF3D71]', dotColor: 'bg-[#FF3D71]', bg: 'bg-[#FF3D71]/10', pulse: false },
   warning: { label: 'Warning', color: 'text-[#FFAA00]', dotColor: 'bg-[#FFAA00]', bg: 'bg-[#FFAA00]/10', pulse: true  },
   unknown: { label: 'Unknown', color: 'text-[#7B8ECC]', dotColor: 'bg-[#7B8ECC]', bg: 'bg-[#7B8ECC]/10', pulse: false },
