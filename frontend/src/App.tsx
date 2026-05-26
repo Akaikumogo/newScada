@@ -152,6 +152,7 @@ function AppLayout() {
               <Route path="/realtime"                            element={<RealtimeRedisPage />} />
               <Route path="/diff"                                element={<DiffPage />} />
               <Route path="/substation/:id/diff"                 element={<DiffPage />} />
+              <Route path="/substation/:id/dif"                  element={<DiffPage />} />
               <Route path="*"                                    element={<Navigate to="/" replace />} />
             </Routes>
           </Suspense>

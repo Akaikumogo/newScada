@@ -332,13 +332,15 @@ export function DiffPage() {
   // URL: /substation/:id/diff?title=<signal_title>
   const selectedTitle = searchParams.get('title') ?? searchParams.get('signal')
   const statuses = useDispatcherStore(s => s.statuses)
+  const liveSignals = useDispatcherStore(s => s.signals)
   useDispatcherStore(s => s.revisions)
 
   const setSelectedTitle = useCallback((title: string) => {
     setSearchParams(prev => {
-      prev.delete('signal')         // drop legacy param
-      prev.set('title', title)
-      return prev
+      const next = new URLSearchParams(prev)
+      next.delete('signal')         // drop legacy param
+      next.set('title', title)
+      return next
     }, { replace: true })
   }, [setSearchParams])
 
@@ -362,9 +364,9 @@ export function DiffPage() {
   const containerRef = useRef<HTMLDivElement>(null)
 
   // ── Load available signal_titles (scoped to substation if set) ──
-  const { data: signals = [], isLoading: signalsLoading } = useQuery({
+  const { data: apiSignals = [], isLoading: signalsLoading } = useQuery({
     queryKey: ['diff-signals', subId],
-    queryFn:  ({ signal }) => telemetryApi.diffSignals({ substation_id: subId, min_devices: 2 }, signal),
+    queryFn:  ({ signal }) => telemetryApi.diffSignals({ substation_id: subId, min_devices: 1 }, signal),
     staleTime: 5 * 60_000,
   })
 
@@ -379,11 +381,68 @@ export function DiffPage() {
   })
   const devices: Device[] = devicesData ?? []
 
+  const deviceSignalTitles = useMemo(() => {
+    const grouped = new Map<string, {
+      signal_title: string
+      device_count: number
+      unit: string | null
+      sample_names: string[]
+      devices: Set<number>
+    }>()
+
+    for (const device of devices) {
+      for (const sig of device.signals ?? []) {
+        const title = (sig.signal_title ?? '').trim()
+        if (!title || (!sig.active && !sig.only_realtime)) continue
+        const item = grouped.get(title) ?? {
+          signal_title: title,
+          device_count: 0,
+          unit: sig.unit || null,
+          sample_names: [],
+          devices: new Set<number>(),
+        }
+        item.devices.add(device.id)
+        if (sig.unit && !item.unit) item.unit = sig.unit
+        if (!item.sample_names.includes(sig.signal_name)) item.sample_names.push(sig.signal_name)
+        grouped.set(title, item)
+      }
+    }
+
+    return Array.from(grouped.values())
+      .map(item => ({
+        signal_title: item.signal_title,
+        device_count: item.devices.size,
+        unit: item.unit,
+        sample_names: item.sample_names.slice(0, 8),
+      }))
+      .sort((a, b) => b.device_count - a.device_count || a.signal_title.localeCompare(b.signal_title))
+  }, [devices])
+
+  const signals = useMemo(() => {
+    if (apiSignals.length === 0) return deviceSignalTitles
+    const byTitle = new Map(deviceSignalTitles.map(s => [s.signal_title, s]))
+    for (const item of apiSignals) byTitle.set(item.signal_title, item)
+    return Array.from(byTitle.values())
+      .sort((a, b) => b.device_count - a.device_count || a.signal_title.localeCompare(b.signal_title))
+  }, [apiSignals, deviceSignalTitles])
+
   const devicesById = useMemo(() => {
     const m = new Map<number, Device>()
     for (const d of devices) m.set(d.id, d)
     return m
   }, [devices])
+
+  const matchingSignalByDevice = useMemo(() => {
+    const m = new Map<number, Device['signals'][number]>()
+    if (!selectedTitle) return m
+    for (const device of devices) {
+      const sig = (device.signals ?? []).find(s =>
+        (s.active || s.only_realtime) && (s.signal_title ?? '').trim() === selectedTitle
+      )
+      if (sig) m.set(device.id, sig)
+    }
+    return m
+  }, [devices, selectedTitle])
 
   // ── Fetch diff data ──────────────────────────────
   const { data: dataMap = {}, isLoading, isError, isFetching } = useQuery({
@@ -789,6 +848,8 @@ export function DiffPage() {
                     const visible = visibility[devId] !== false
                     const color = deviceColors[devId]
                     const dev   = devicesById.get(devId)
+                    const matchedSignal = matchingSignalByDevice.get(devId)
+                    const liveValue = matchedSignal ? liveSignals[devId]?.[matchedSignal.signal_name] : undefined
                     const status = statuses[devId]
                     const online = status?.status === 'online'
 
@@ -825,6 +886,19 @@ export function DiffPage() {
                             <span className="text-[9px] font-mono text-ink-300/60 truncate block">
                               {dev.iec104_host}
                             </span>
+                          )}
+                          {matchedSignal && (
+                            <div className="mt-0.5 flex items-center justify-between gap-2">
+                              <span className="text-[9px] font-mono text-ink-300/70 truncate">
+                                IOA {matchedSignal.register_code} · {matchedSignal.signal_name}
+                              </span>
+                              <span className="text-[10px] font-mono font-semibold text-[var(--text)] flex-shrink-0">
+                                {fmtVal(liveValue?.value)}
+                                {matchedSignal.unit && (
+                                  <span className="ml-1 text-[8px] font-normal text-ink-300">{matchedSignal.unit}</span>
+                                )}
+                              </span>
+                            </div>
                           )}
                         </div>
                       </button>
