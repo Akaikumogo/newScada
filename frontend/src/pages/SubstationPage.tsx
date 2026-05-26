@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { useQuery } from '@tanstack/react-query'
 import {
   ArrowLeft, Network, LayoutGrid, BarChart2, Table2,
-  ChevronDown, Wifi, WifiOff, Search,
+  ChevronDown, Wifi, WifiOff, Search, GitCompare,
 } from 'lucide-react'
 import { DeviceCard, DeviceCardSkeleton } from '@/components/dispatcher/DeviceCard'
 import { SignalChart, type TimeRange } from '@/components/dispatcher/SignalChart'
@@ -307,6 +307,21 @@ export function SubstationPage() {
                 />
               </div>
             )}
+
+            <button
+              onClick={() => navigate(`/substation/${substationId}/diff`)}
+              className="
+                flex items-center gap-1.5 h-8 px-3 rounded-lg
+                text-[12px] font-medium text-ink-200
+                hover:text-[var(--text)] bg-[var(--bg-card)]
+                border border-[var(--border)] hover:border-[var(--border-hover)]
+                transition-all active:scale-[0.97]
+              "
+              title="Bir xil signalni shu PS ichidagi qurilmalar bo'yicha taqqoslash"
+            >
+              <GitCompare size={13} />
+              Diff
+            </button>
 
             <button
               onClick={() => navigate(`/substation/${substationId}/schema`)}

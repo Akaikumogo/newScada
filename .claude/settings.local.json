@@ -4,7 +4,8 @@
       "Bash(npx tsc *)",
       "Bash(python -c ' *)",
       "PowerShell(try { \\(Get-Command redis-server -ErrorAction Stop\\).Source } catch {}; try { docker --version } catch {}; try { wsl --list --quiet } catch {})",
-      "PowerShell($pdf = \"C:\\\\Users\\\\User\\\\Downloads\\\\Telegram Desktop\\\\9_Юнусабад-Model.pdf\"; $out = \"C:\\\\Users\\\\User\\\\Desktop\\\\newScada\\\\_schema_preview.png\"; if \\(Get-Command magick -ErrorAction SilentlyContinue\\) { magick convert \"$pdf[0]\" -density 150 $out; Write-Host \"Converted with ImageMagick\" } else { Write-Host \"ImageMagick not installed\" })"
+      "PowerShell($pdf = \"C:\\\\Users\\\\User\\\\Downloads\\\\Telegram Desktop\\\\9_Юнусабад-Model.pdf\"; $out = \"C:\\\\Users\\\\User\\\\Desktop\\\\newScada\\\\_schema_preview.png\"; if \\(Get-Command magick -ErrorAction SilentlyContinue\\) { magick convert \"$pdf[0]\" -density 150 $out; Write-Host \"Converted with ImageMagick\" } else { Write-Host \"ImageMagick not installed\" })",
+      "Bash(curl -sS http://localhost:8000/api/health)"
     ]
   }
 }

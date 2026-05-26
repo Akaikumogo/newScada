@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect, useRef, useCallback } from 'react'
 import { createPortal } from 'react-dom'
-import { useSearchParams } from 'react-router-dom'
+import { useSearchParams, useParams, useNavigate } from 'react-router-dom'
 import {
   ResponsiveContainer, ComposedChart, Line,
   XAxis, YAxis, CartesianGrid, Tooltip, Brush,
@@ -9,10 +9,10 @@ import { useQuery } from '@tanstack/react-query'
 import {
   Loader2, AlertCircle, TrendingUp, Eye, EyeOff,
   ZoomIn, ZoomOut, RotateCcw, Percent, Search, GitCompare,
-  ChevronDown, Wifi, WifiOff,
+  ChevronDown, Wifi, WifiOff, ArrowLeft,
 } from 'lucide-react'
 import { format } from 'date-fns'
-import { telemetryApi, deviceApi, type RangePoint } from '@/lib/api'
+import { telemetryApi, deviceApi, substationApi, type RangePoint } from '@/lib/api'
 import { useDispatcherStore } from '@/store/dispatcher'
 import type { Device } from '@/types'
 
@@ -325,8 +325,11 @@ function SignalPicker({
 //  Main Page
 // ──────────────────────────────────────────────────
 export function DiffPage() {
+  const { id }     = useParams<{ id: string }>()
+  const subId      = id ? Number(id) : undefined
+  const navigate   = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
-  // URL: ?title=<signal_title>  (legacy ?signal= still accepted for old links)
+  // URL: /substation/:id/diff?title=<signal_title>
   const selectedTitle = searchParams.get('title') ?? searchParams.get('signal')
   const statuses = useDispatcherStore(s => s.statuses)
   useDispatcherStore(s => s.revisions)
@@ -339,6 +342,14 @@ export function DiffPage() {
     }, { replace: true })
   }, [setSearchParams])
 
+  // Load substation info for header
+  const { data: substation } = useQuery({
+    queryKey: ['substation', subId],
+    queryFn:  ({ signal }) => substationApi.getById(subId!, signal),
+    enabled:  !!subId,
+    staleTime: 5 * 60_000,
+  })
+
   // ── Time range state ─────────────────────────────
   const [fromTs, setFromTs] = useState<Date>(() => new Date(Date.now() - 86400_000))
   const [toTs,   setToTs]   = useState<Date>(() => new Date())
@@ -350,20 +361,23 @@ export function DiffPage() {
 
   const containerRef = useRef<HTMLDivElement>(null)
 
-  // ── Load available signal names ──────────────────
+  // ── Load available signal_titles (scoped to substation if set) ──
   const { data: signals = [], isLoading: signalsLoading } = useQuery({
-    queryKey: ['diff-signals'],
-    queryFn:  ({ signal }) => telemetryApi.diffSignals(2, signal),
+    queryKey: ['diff-signals', subId],
+    queryFn:  ({ signal }) => telemetryApi.diffSignals({ substation_id: subId, min_devices: 2 }, signal),
     staleTime: 5 * 60_000,
   })
 
-  // ── Load all devices (for legend names + IPs) ───
-  const { data: devicesPage } = useQuery({
-    queryKey: ['devices-all'],
-    queryFn:  ({ signal }) => deviceApi.listAll(signal),
+  // ── Load devices (substation-scoped if subId, else all) ────────
+  const { data: devicesData } = useQuery({
+    queryKey: ['diff-devices', subId],
+    queryFn:  ({ signal }) =>
+      subId != null
+        ? deviceApi.list(subId, signal)
+        : deviceApi.listAll(signal),
     staleTime: 60_000,
   })
-  const devices: Device[] = devicesPage ?? []
+  const devices: Device[] = devicesData ?? []
 
   const devicesById = useMemo(() => {
     const m = new Map<number, Device>()
@@ -373,11 +387,12 @@ export function DiffPage() {
 
   // ── Fetch diff data ──────────────────────────────
   const { data: dataMap = {}, isLoading, isError, isFetching } = useQuery({
-    queryKey: ['diff', selectedTitle, fromTs.getTime(), toTs.getTime()],
+    queryKey: ['diff', subId, selectedTitle, fromTs.getTime(), toTs.getTime()],
     queryFn:  ({ signal: abortSignal }) => telemetryApi.diff({
-      signal_title: selectedTitle!,
-      from_ts:      fromTs,
-      to_ts:        toTs,
+      signal_title:  selectedTitle!,
+      substation_id: subId,
+      from_ts:       fromTs,
+      to_ts:         toTs,
     }, abortSignal),
     staleTime: 30_000,
     placeholderData: prev => prev,
@@ -528,15 +543,36 @@ export function DiffPage() {
       <div className="flex-shrink-0 px-6 py-4 border-b border-[var(--border)] bg-[var(--bg-base)]/80 backdrop-blur-sm">
         <div className="flex items-center justify-between gap-4 flex-wrap">
           <div className="flex items-center gap-3 min-w-0">
+            {subId != null && (
+              <button
+                onClick={() => navigate(`/substation/${subId}`)}
+                className="
+                  w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0
+                  bg-[var(--bg-card)] border border-[var(--border)]
+                  text-ink-200 hover:text-[var(--text)] hover:border-[var(--border-hover)]
+                  transition-all active:scale-95
+                "
+              >
+                <ArrowLeft size={14} />
+              </button>
+            )}
+
             <div className="w-10 h-10 rounded-xl bg-[var(--electric)]/10 border border-[var(--electric)]/20 flex items-center justify-center flex-shrink-0">
               <GitCompare size={18} className="text-[var(--electric)]" />
             </div>
             <div>
               <h1 className="text-[17px] font-semibold text-[var(--text)]">
                 Signal taqqoslash
+                {substation && (
+                  <span className="ml-2 text-[12px] font-normal text-ink-300">
+                    · {substation.name}
+                  </span>
+                )}
               </h1>
               <p className="text-[11px] text-ink-300 mt-0.5">
-                Bir xil signalning turli qurilmalardan kelishini solishtirish
+                {subId
+                  ? `${substation?.name ?? 'Podstansiya'} ichidagi qurilmalarni taqqoslash`
+                  : 'Barcha qurilmalarni taqqoslash'}
               </p>
             </div>
           </div>

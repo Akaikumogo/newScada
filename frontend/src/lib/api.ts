@@ -140,10 +140,11 @@ export const telemetryApi = {
    */
   diff: (
     params: {
-      signal_title:   string
-      from_ts:        Date | string
-      to_ts:          Date | string
-      target_points?: number
+      signal_title:    string
+      substation_id?:  number
+      from_ts:         Date | string
+      to_ts:           Date | string
+      target_points?:  number
     },
     signal?: AbortSignal,
   ) => {
@@ -151,14 +152,19 @@ export const telemetryApi = {
     qs.set('signal_title', params.signal_title)
     qs.set('from_ts',      params.from_ts instanceof Date ? params.from_ts.toISOString() : params.from_ts)
     qs.set('to_ts',        params.to_ts   instanceof Date ? params.to_ts.toISOString()   : params.to_ts)
-    if (params.target_points) qs.set('target_points', String(params.target_points))
+    if (params.substation_id != null) qs.set('substation_id', String(params.substation_id))
+    if (params.target_points)         qs.set('target_points',  String(params.target_points))
     return request<Record<string, RangePoint[]>>(`/telemetry/diff?${qs}`, { signal })
   },
 
   /** List signal_titles available for diffing (present on >= min_devices) */
-  diffSignals: (minDevices = 2, signal?: AbortSignal) => {
+  diffSignals: (
+    params?: { substation_id?: number; min_devices?: number },
+    signal?: AbortSignal,
+  ) => {
     const qs = new URLSearchParams()
-    qs.set('min_devices', String(minDevices))
+    qs.set('min_devices', String(params?.min_devices ?? 2))
+    if (params?.substation_id != null) qs.set('substation_id', String(params.substation_id))
     return request<Array<{
       signal_title:  string
       device_count:  number

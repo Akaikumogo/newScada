@@ -339,30 +339,36 @@ async def get_history_range_multi(
 
 @router.get("/diff/signals", response_model=list[dict])
 async def list_diff_signals(
-    min_devices: int = Query(2, ge=1, le=1000),
+    substation_id: int | None = Query(None, description="Filter by substation"),
+    min_devices:   int        = Query(2, ge=1, le=1000),
     db: AsyncSession = Depends(get_db),
 ):
     """
     Distinct signal_titles with the number of devices that have them
     (active/realtime).  Used by the Diff page's title picker.
 
-    Filtered to titles present on >= min_devices devices.
+    If `substation_id` is given, only devices in that substation are counted.
     """
     sql = text("""
         SELECT
-            signal_title,
-            COUNT(DISTINCT device_id)                 AS device_count,
-            MIN(unit)                                 AS unit,
-            (array_agg(DISTINCT signal_name))[1:3]    AS sample_names
-        FROM device_signal
-        WHERE (active = true OR only_realtime = true)
-          AND signal_title IS NOT NULL
-          AND signal_title <> ''
-        GROUP BY signal_title
-        HAVING COUNT(DISTINCT device_id) >= :min_devices
-        ORDER BY device_count DESC, signal_title
+            ds.signal_title,
+            COUNT(DISTINCT ds.device_id)                  AS device_count,
+            MIN(ds.unit)                                  AS unit,
+            (array_agg(DISTINCT ds.signal_name))[1:3]     AS sample_names
+        FROM device_signal ds
+        JOIN device d ON d.id = ds.device_id
+        WHERE (ds.active = true OR ds.only_realtime = true)
+          AND ds.signal_title IS NOT NULL
+          AND ds.signal_title <> ''
+          AND (:substation_id IS NULL OR d.substation_id = :substation_id)
+        GROUP BY ds.signal_title
+        HAVING COUNT(DISTINCT ds.device_id) >= :min_devices
+        ORDER BY device_count DESC, ds.signal_title
     """)
-    result = await db.execute(sql, {"min_devices": min_devices})
+    result = await db.execute(sql, {
+        "min_devices":   min_devices,
+        "substation_id": substation_id,
+    })
     return [
         {
             "signal_title": row.signal_title,
@@ -376,10 +382,11 @@ async def list_diff_signals(
 
 @router.get("/diff", response_model=dict[int, list[RangePoint]])
 async def get_diff(
-    signal_title:  str      = Query(..., min_length=1),
-    from_ts:       datetime = Query(...),
-    to_ts:         datetime = Query(...),
-    target_points: int      = Query(TARGET_POINTS, ge=50, le=5000),
+    signal_title:  str               = Query(..., min_length=1),
+    substation_id: int | None        = Query(None, description="Filter to one substation"),
+    from_ts:       datetime          = Query(...),
+    to_ts:         datetime          = Query(...),
+    target_points: int               = Query(TARGET_POINTS, ge=50, le=5000),
     db: AsyncSession = Depends(get_db),
 ):
     """
@@ -388,18 +395,24 @@ async def get_diff(
     Each device may have its own signal_name for the same title — we
     JOIN record with device_signal so the per-device mapping is correct.
 
+    If `substation_id` is provided, only devices in that substation are returned.
+
     Returns { device_id: RangePoint[] }.
     """
     if to_ts <= from_ts:
         return {}
 
-    # Devices that define this title (active/realtime)
+    # Devices that define this title (active/realtime), optionally scoped
     sig_q = select(DeviceSignal.device_id).where(
         DeviceSignal.signal_title == signal_title,
         (DeviceSignal.active.is_(True)) | (DeviceSignal.only_realtime.is_(True)),
     ).distinct()
-    device_ids = [row[0] for row in (await db.execute(sig_q)).all()]
+    if substation_id is not None:
+        sig_q = sig_q.join(Device, Device.id == DeviceSignal.device_id).where(
+            Device.substation_id == substation_id
+        )
 
+    device_ids = [row[0] for row in (await db.execute(sig_q)).all()]
     grouped: dict[int, list[RangePoint]] = {dev_id: [] for dev_id in device_ids}
 
     if not device_ids:
@@ -410,13 +423,14 @@ async def get_diff(
     bucket_sec = min(bucket_sec, MAX_BUCKET_SEC)
 
     # JOIN record with device_signal so each device's own signal_name
-    # is matched against its records.
+    # is matched against its records.  Substation filter applied via device_ids.
     sql = text("""
         WITH pairs AS (
             SELECT device_id, signal_name
             FROM device_signal
             WHERE signal_title = :signal_title
               AND (active = true OR only_realtime = true)
+              AND device_id = ANY(:device_ids)
         )
         SELECT
             r.device_id                                       AS dev,
@@ -442,6 +456,7 @@ async def get_diff(
     result = await db.execute(sql, {
         "bucket_sec":   bucket_sec,
         "signal_title": signal_title,
+        "device_ids":   device_ids,
         "from_ts":      from_ts,
         "to_ts":        to_ts,
     })

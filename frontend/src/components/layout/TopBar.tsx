@@ -169,7 +169,10 @@ export function TopBar({ branches, substations, onBranchChange }: Props) {
         <WsIndicator />
 
         <motion.button
-          onClick={() => navigate('/diff')}
+          onClick={() => {
+            const subId = useDispatcherStore.getState().selectedSubstationId
+            navigate(subId ? `/substation/${subId}/diff` : '/diff')
+          }}
           className="
             h-8 px-3 rounded-xl flex items-center gap-1.5
             bg-[var(--bg-card)] border border-[var(--border)]
@@ -178,7 +181,7 @@ export function TopBar({ branches, substations, onBranchChange }: Props) {
           "
           whileHover={{ scale: 1.03 }}
           whileTap={{ scale: 0.96 }}
-          title="Cross-device signal comparison"
+          title="Tanlangan PS ichidagi qurilmalarni taqqoslash"
         >
           <GitCompare size={13} />
           Diff

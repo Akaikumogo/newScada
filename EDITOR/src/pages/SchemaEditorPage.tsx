@@ -572,11 +572,12 @@ function SignalBindingFields({
 }: { data: any; devices: Device[]; onPatch: (p: Record<string, any>) => void }) {
   const [searchD, setSearchD] = useState('')
   const [searchS, setSearchS] = useState('')
+  const [onlyActive, setOnlyActive] = useState(false)
 
-  // Load signals for selected device
-  const { data: sigsPage } = useQuery({
+  // Load signals for selected device (no limit, all signals)
+  const { data: sigsPage, isLoading: signalsLoading } = useQuery({
     queryKey: ['signals', data.device_id, 'all'],
-    queryFn:  () => signalApi.list(data.device_id, 0, 1000),
+    queryFn:  () => signalApi.list(data.device_id, 0, 5000),
     enabled:  !!data.device_id,
   })
   const signals: Signal[] = sigsPage?.items ?? []
@@ -585,18 +586,23 @@ function SignalBindingFields({
     devices.filter(d => !searchD.trim() || d.name.toLowerCase().includes(searchD.toLowerCase())),
     [devices, searchD],
   )
+
+  // Show ALL signals by default — active flag controls data flow at runtime,
+  // not whether you can bind to it in the schema editor.
   const filteredSignals = useMemo(() =>
     signals
-      .filter(s => s.active || s.only_realtime)
+      .filter(s => !onlyActive || s.active || s.only_realtime)
       .filter(s => !searchS.trim() ||
         s.signal_name.toLowerCase().includes(searchS.toLowerCase()) ||
         (s.signal_title ?? '').toLowerCase().includes(searchS.toLowerCase())
       ),
-    [signals, searchS],
+    [signals, searchS, onlyActive],
   )
 
   const selectedDevice = devices.find(d => d.id === data.device_id)
   const selectedSignal = signals.find(s => s.signal_name === data.signal_name)
+
+  const activeCount = signals.filter(s => s.active || s.only_realtime).length
 
   return (
     <>
@@ -647,35 +653,94 @@ function SignalBindingFields({
               )}
             </div>
           )}
-          <input
-            type="text"
-            value={searchS}
-            onChange={e => setSearchS(e.target.value)}
-            placeholder="Signal qidirish..."
-            className="w-full h-7 px-2 mb-1 text-[11px] rounded-md bg-[var(--bg-page)] border border-[var(--border)] focus:outline-none focus:ring-1 focus:ring-[var(--brand)]/40"
-          />
-          <div className="max-h-[200px] overflow-y-auto rounded-md border border-[var(--border)]">
-            {filteredSignals.length === 0 ? (
-              <div className="px-2 py-3 text-center text-[10px] text-ink-300/60">Active signal yo'q</div>
+          {/* Search + filter toggle */}
+          <div className="flex items-center gap-1 mb-1">
+            <input
+              type="text"
+              value={searchS}
+              onChange={e => setSearchS(e.target.value)}
+              placeholder="Signal qidirish..."
+              className="flex-1 h-7 px-2 text-[11px] rounded-md bg-[var(--bg-page)] border border-[var(--border)] focus:outline-none focus:ring-1 focus:ring-[var(--brand)]/40"
+            />
+            <button
+              type="button"
+              onClick={() => setOnlyActive(v => !v)}
+              className={`
+                h-7 px-2 rounded-md text-[10px] font-medium border transition-colors
+                ${onlyActive
+                  ? 'bg-[var(--brand)] text-white border-[var(--brand)]'
+                  : 'bg-[var(--bg-page)] text-ink-300 border-[var(--border)] hover:text-[var(--text)]'
+                }
+              `}
+              title="Faqat active/realtime signallar"
+            >
+              ● active
+            </button>
+          </div>
+
+          {/* Counts */}
+          <div className="text-[9px] text-ink-300/60 mb-1 px-1 flex items-center justify-between">
+            <span>
+              {signalsLoading ? 'Yuklanmoqda...' :
+               `${filteredSignals.length} / ${signals.length} ko'rsatilgan`}
+            </span>
+            <span className="font-mono">
+              {activeCount} active · {signals.length - activeCount} inactive
+            </span>
+          </div>
+
+          <div className="max-h-[240px] overflow-y-auto rounded-md border border-[var(--border)]">
+            {signalsLoading ? (
+              <div className="px-2 py-3 text-center text-[10px] text-ink-300/60">Yuklanmoqda...</div>
+            ) : signals.length === 0 ? (
+              <div className="px-2 py-3 text-center text-[10px] text-ink-300/60">
+                Bu qurilmada signal yo'q.
+                <br /><span className="text-[9px]">Editorda model qo'llang</span>
+              </div>
+            ) : filteredSignals.length === 0 ? (
+              <div className="px-2 py-3 text-center text-[10px] text-ink-300/60">
+                {onlyActive ? 'Active signal topilmadi' : 'Qidiruv natijasi yo\'q'}
+              </div>
             ) : (
-              filteredSignals.map(s => (
-                <button
-                  key={s.id}
-                  onClick={() => onPatch({
-                    signal_name: s.signal_name,
-                    unit:        s.unit,
-                    label:       data.label || s.signal_name,
-                  })}
-                  className={`
-                    w-full flex items-center justify-between gap-2 px-2 py-1 text-left text-[11px]
-                    border-b border-[var(--border)] last:border-0
-                    ${data.signal_name === s.signal_name ? 'bg-[var(--brand)]/10 text-[var(--text)]' : 'text-ink-200 hover:bg-[var(--bg-page)]'}
-                  `}
-                >
-                  <span className="truncate font-mono">{s.signal_name}</span>
-                  {s.unit && <span className="text-[9px] text-ink-300 flex-shrink-0">{s.unit}</span>}
-                </button>
-              ))
+              filteredSignals.map(s => {
+                const isActive   = s.active || s.only_realtime
+                const isSelected = data.signal_name === s.signal_name
+                return (
+                  <button
+                    key={s.id}
+                    onClick={() => onPatch({
+                      signal_name: s.signal_name,
+                      unit:        s.unit,
+                      label:       data.label || s.signal_title || s.signal_name,
+                    })}
+                    className={`
+                      w-full flex items-center gap-2 px-2 py-1 text-left text-[11px]
+                      border-b border-[var(--border)] last:border-0
+                      ${isSelected ? 'bg-[var(--brand)]/10 text-[var(--text)]' : 'text-ink-200 hover:bg-[var(--bg-page)]'}
+                      ${!isActive ? 'opacity-60' : ''}
+                    `}
+                  >
+                    {/* Status dot */}
+                    <span
+                      className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${
+                        s.active ? 'bg-[#00D68F]' :
+                        s.only_realtime ? 'bg-[#FFAA00]' :
+                        'bg-[var(--border)]'
+                      }`}
+                      title={s.active ? 'Active' : s.only_realtime ? 'Realtime-only' : 'Inactive'}
+                    />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-1.5">
+                        <span className="truncate font-mono text-[10px]">{s.signal_name}</span>
+                        {s.unit && <span className="text-[9px] text-ink-300 flex-shrink-0">{s.unit}</span>}
+                      </div>
+                      {s.signal_title && (
+                        <div className="text-[9px] text-ink-300/70 truncate">{s.signal_title}</div>
+                      )}
+                    </div>
+                  </button>
+                )
+              })
             )}
           </div>
         </FieldGroup>
