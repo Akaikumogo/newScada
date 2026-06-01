@@ -1,5 +1,6 @@
 from datetime import datetime
 from sqlalchemy import (
+    Index,
     BigInteger, Float, ForeignKey, Integer, SmallInteger,
     String, Text, Boolean, DateTime, UniqueConstraint, TIMESTAMP,
 )
@@ -119,6 +120,7 @@ class DeviceSignal(Base):
     __tablename__ = "device_signal"
     __table_args__ = (
         UniqueConstraint("device_id", "register_code", name="uq_device_ioa"),
+        Index("ix_device_signal_title_device_name", "signal_title", "device_id", "signal_name"),
     )
 
     id:             Mapped[int]       = mapped_column(Integer, primary_key=True)
@@ -139,6 +141,9 @@ class DeviceSignal(Base):
 # ══════════════════════════════════════════════════
 class Record(Base):
     __tablename__ = "record"
+    __table_args__ = (
+        Index("ix_record_device_signal_time", "device_id", "signal_name", "captured_at"),
+    )
 
     id:          Mapped[int]      = mapped_column(BigInteger, primary_key=True)
     device_id:   Mapped[int]      = mapped_column(Integer, nullable=False, index=True)

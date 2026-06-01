@@ -11,6 +11,7 @@ import { SignalChart, type TimeRange } from '@/components/dispatcher/SignalChart
 import { HistoryTable } from '@/components/dispatcher/HistoryTable'
 import { StatusBadge } from '@/components/dispatcher/StatusBadge'
 import { deviceApi, substationApi, telemetryApi } from '@/lib/api'
+import { RANGE_PRESETS } from '@/lib/timeRange'
 import { useDispatcherStore } from '@/store/dispatcher'
 import type { Device } from '@/types'
 
@@ -24,12 +25,10 @@ const TABS: { value: Tab; icon: React.ElementType; label: string }[] = [
 ]
 
 // ── Time Ranges ──────────────────────────────────
-const TIME_RANGES: { value: TimeRange; label: string }[] = [
-  { value: '1h',  label: '1S' },
-  { value: '6h',  label: '6S' },
-  { value: '24h', label: '24S' },
-  { value: '7d',  label: '7K' },
-]
+const TIME_RANGES: { value: TimeRange; label: string }[] = RANGE_PRESETS.map(p => ({
+  value: p.value,
+  label: p.shortLabel,
+}))
 
 function TimeRangeBar({ value, onChange }: { value: TimeRange; onChange: (v: TimeRange) => void }) {
   return (
@@ -41,7 +40,7 @@ function TimeRangeBar({ value, onChange }: { value: TimeRange; onChange: (v: Tim
           className={`
             relative px-3 h-7 rounded-md text-[12px] font-medium transition-colors
             ${value === r.value
-              ? 'text-white bg-[var(--electric)]'
+              ? 'text-white bg-[var(--electric)] shadow-[0_0_18px_rgba(41,121,255,0.35)] ring-1 ring-[var(--electric-light)]/40'
               : 'text-ink-300 hover:text-[var(--text)]'
             }
           `}
@@ -134,7 +133,7 @@ function TabButton({
 //  All filter state persists in the URL:
 //   • tab       → monitoring | charts | table
 //   • device    → selected device ID
-//   • range     → 1h | 6h | 24h | 7d
+//   • range     → 15m | 1h | 6h | 1d | 1w | 1mo | 3mo | 1y
 //   • q         → device search query (monitoring tab)
 //
 export function SubstationPage() {
@@ -148,7 +147,8 @@ export function SubstationPage() {
 
   // ── Read state from URL ────────────────────────
   const tab            = (searchParams.get('tab') as Tab) || 'monitoring'
-  const timeRange      = (searchParams.get('range') as TimeRange) || '1h'
+  const rawRange       = searchParams.get('range') as TimeRange | null
+  const timeRange      = RANGE_PRESETS.some(p => p.value === rawRange) ? rawRange! : '1h'
   const selectedDevice = searchParams.has('device') ? Number(searchParams.get('device')) : null
   const searchQuery    = searchParams.get('q') || ''
 

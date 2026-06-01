@@ -1,4 +1,7 @@
 import type { Branch, Substation, Device, LiveDeviceData } from '@/types'
+import type { HistoryRange } from './timeRange'
+
+export type { HistoryRange } from './timeRange'
 
 const BASE = '/api'
 
@@ -70,8 +73,6 @@ export const deviceApi = {
 }
 
 // ── Telemetry ─────────────────────────────────────
-export type HistoryRange = '1h' | '6h' | '24h' | '7d'
-
 export interface HistoryPoint {
   id:          number
   device_id:   number

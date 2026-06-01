@@ -9,6 +9,8 @@ import {
 import { format } from 'date-fns'
 import { TrendingUp, TrendingDown, Minus, AlertCircle } from 'lucide-react'
 import { telemetryApi } from '@/lib/api'
+import { RANGE_PRESETS, presetMs, roundedQueryDate, type HistoryRange } from '@/lib/timeRange'
+import { useLiveNow } from '@/hooks/useLiveNow'
 import type { Signal } from '@/types'
 
 // ── Smart number formatter ───────────────────────
@@ -108,13 +110,17 @@ function TrendBadge({ trend }: { trend: TrendInfo }) {
 }
 
 // ── Time range config ─────────────────────────────
-export type TimeRange = '1h' | '6h' | '24h' | '7d'
+export type TimeRange = HistoryRange
 
 const RANGE_CONFIG: Record<TimeRange, { label: string; tickFormat: string }> = {
+  '15m': { label: '15 minut', tickFormat: 'HH:mm:ss' },
   '1h':  { label: '1 soat',  tickFormat: 'HH:mm:ss' },
   '6h':  { label: '6 soat',  tickFormat: 'HH:mm'    },
-  '24h': { label: '24 soat', tickFormat: 'HH:mm'    },
-  '7d':  { label: '7 kun',   tickFormat: 'dd MMM'   },
+  '1d':  { label: '1 kun',   tickFormat: 'HH:mm'    },
+  '1w':  { label: '1 hafta', tickFormat: 'dd MMM'   },
+  '1mo': { label: '1 oy',    tickFormat: 'dd MMM'   },
+  '3mo': { label: '3 oy',    tickFormat: 'dd MMM'   },
+  '1y':  { label: '1 yil',   tickFormat: 'MMM yyyy' },
 }
 
 // ── Custom Tooltip ────────────────────────────────
@@ -169,20 +175,24 @@ export const SignalChart = memo(function SignalChart({
   deviceId, signal, timeRange, index,
 }: SignalChartProps) {
   const cfg = RANGE_CONFIG[timeRange]
+  const now = useLiveNow()
+  const toTs = roundedQueryDate(now)
+  const fromTs = useMemo(() => new Date(toTs.getTime() - presetMs(timeRange)), [timeRange, toTs])
 
   const { data = [], isLoading, isError } = useQuery({
-    queryKey: ['history', deviceId, signal.signal_name, timeRange],
-    queryFn:  ({ signal: abortSignal }) => telemetryApi.history({
+    queryKey: ['signal-range', deviceId, signal.signal_name, timeRange, toTs.getTime()],
+    queryFn:  ({ signal: abortSignal }) => telemetryApi.range({
       device_id:   deviceId,
       signal_name: signal.signal_name,
-      range:       timeRange,
+      from_ts:     fromTs,
+      to_ts:       toTs,
+      target_points: 900,
     }, abortSignal),
-    staleTime: 60_000,
-    refetchInterval: timeRange === '1h' ? 30_000 : 120_000,
+    staleTime: 25_000,
   })
 
   const { values, min, max, avg, trend, chartData } = useMemo(() => {
-    const vals = data.map(d => d.value).filter((v): v is number => v != null)
+    const vals = data.map(d => d.avg).filter((v): v is number => v != null)
     const mn = vals.length ? Math.min(...vals) : null
     const mx = vals.length ? Math.max(...vals) : null
     const av = vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null
@@ -190,8 +200,8 @@ export const SignalChart = memo(function SignalChart({
     const tr = calculateTrend(vals)
 
     const cd = data.map(d => ({
-      ts:    format(new Date(d.captured_at), cfg.tickFormat),
-      value: d.value,
+      ts:    format(new Date(d.ts), cfg.tickFormat),
+      value: d.avg,
     }))
 
     return { values: vals, min: mn, max: mx, avg: av, trend: tr, chartData: cd }
@@ -330,7 +340,7 @@ export const SignalChart = memo(function SignalChart({
       {/* Record count */}
       {!isLoading && !isError && (
         <div className="px-4 pb-2.5 text-[10px] text-ink-300/50 text-right">
-          {data.length} ta yozuv
+          {data.length} ta bucket · {RANGE_PRESETS.find(p => p.value === timeRange)?.label ?? cfg.label}
         </div>
       )}
     </motion.div>

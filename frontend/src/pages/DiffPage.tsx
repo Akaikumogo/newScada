@@ -13,6 +13,16 @@ import {
 } from 'lucide-react'
 import { format } from 'date-fns'
 import { telemetryApi, deviceApi, substationApi, type RangePoint } from '@/lib/api'
+import {
+  RANGE_PRESETS,
+  fromLocalInputValue,
+  presetMs,
+  roundedQueryDate,
+  toLocalInputValue,
+  type HistoryRange,
+} from '@/lib/timeRange'
+import { useChunkedRangeRows } from '@/hooks/useChunkedRangeRows'
+import { useLiveNow } from '@/hooks/useLiveNow'
 import { useDispatcherStore } from '@/store/dispatcher'
 import type { Device } from '@/types'
 
@@ -354,7 +364,9 @@ export function DiffPage() {
 
   // ── Time range state ─────────────────────────────
   const [fromTs, setFromTs] = useState<Date>(() => new Date(Date.now() - 86400_000))
-  const [toTs,   setToTs]   = useState<Date>(() => new Date())
+  const toTs = useLiveNow()
+  const queryToTs = useMemo(() => roundedQueryDate(toTs), [toTs])
+  const [activeRange, setActiveRange] = useState<HistoryRange | null>('1d')
 
   // ── UI state ─────────────────────────────────────
   const [normalize, setNormalize] = useState(false)
@@ -446,12 +458,12 @@ export function DiffPage() {
 
   // ── Fetch diff data ──────────────────────────────
   const { data: dataMap = {}, isLoading, isError, isFetching } = useQuery({
-    queryKey: ['diff', subId, selectedTitle, fromTs.getTime(), toTs.getTime()],
+    queryKey: ['diff', subId, selectedTitle, fromTs.getTime(), queryToTs.getTime()],
     queryFn:  ({ signal: abortSignal }) => telemetryApi.diff({
       signal_title:  selectedTitle!,
       substation_id: subId,
       from_ts:       fromTs,
-      to_ts:         toTs,
+      to_ts:         queryToTs,
     }, abortSignal),
     staleTime: 30_000,
     placeholderData: prev => prev,
@@ -486,17 +498,9 @@ export function DiffPage() {
   }, [deviceIds.join(',')])  // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Merge to row-oriented data ───────────────────
-  const chartData = useMemo(() => {
-    const rows = new Map<number, Record<string, any>>()
-    for (const [devIdStr, points] of Object.entries(dataMap as Record<string, RangePoint[]>)) {
-      for (const p of points) {
-        const t = new Date(p.ts).getTime()
-        if (!rows.has(t)) rows.set(t, { ts: t })
-        rows.get(t)![devIdStr] = p.avg
-      }
-    }
-    return Array.from(rows.values()).sort((a, b) => a.ts - b.ts)
-  }, [dataMap])
+  const { rows: chartData, isProcessing: isChunking } = useChunkedRangeRows(
+    dataMap as Record<string, RangePoint[]>,
+  )
 
   // ── Normalize ────────────────────────────────────
   const displayData = useMemo(() => {
@@ -548,17 +552,25 @@ export function DiffPage() {
   }, [deviceIds, legendQuery, devicesById])
 
   // ── Range presets ────────────────────────────────
-  const setPreset = useCallback((sec: number) => {
-    setToTs(new Date())
-    setFromTs(new Date(Date.now() - sec * 1000))
+  const setPreset = useCallback((range: HistoryRange) => {
+    setActiveRange(range)
+    setFromTs(new Date(Date.now() - presetMs(range)))
+  }, [])
+
+  const setCustomFrom = useCallback((value: string) => {
+    const next = fromLocalInputValue(value)
+    if (!next) return
+    setActiveRange(null)
+    setFromTs(next)
   }, [])
 
   const zoom = useCallback((factor: number) => {
     const center = (fromTs.getTime() + toTs.getTime()) / 2
     const span   = toTs.getTime() - fromTs.getTime()
     const newSpan = Math.max(60_000, Math.min(2 * 365 * 86400_000, span * factor))
-    setFromTs(new Date(center - newSpan / 2))
-    setToTs(new Date(center + newSpan / 2))
+    const nextTo = Math.min(Date.now(), center + newSpan / 2)
+    setActiveRange(null)
+    setFromTs(new Date(nextTo - newSpan))
   }, [fromTs, toTs])
 
   // Ctrl/Shift + wheel zoom
@@ -582,17 +594,6 @@ export function DiffPage() {
 
   const totalPoints = chartData.length
   const spanMs = toTs.getTime() - fromTs.getTime()
-
-  const PRESETS = [
-    { label: '15m', sec: 15 * 60 },
-    { label: '1h',  sec: 3600 },
-    { label: '6h',  sec: 6 * 3600 },
-    { label: '1d',  sec: 86400 },
-    { label: '1w',  sec: 7 * 86400 },
-    { label: '1mo', sec: 30 * 86400 },
-    { label: '3mo', sec: 90 * 86400 },
-    { label: '1y',  sec: 365 * 86400 },
-  ]
 
   const selectedMeta = signals.find(s => s.signal_title === selectedTitle)
 
@@ -679,6 +680,11 @@ export function DiffPage() {
                         <Loader2 size={9} className="animate-spin" /> yangilanmoqda
                       </span>
                     )}
+                    {isChunking && (
+                      <span className="text-[10px] text-[#FFAA00] flex items-center gap-1">
+                        <Loader2 size={9} className="animate-spin" /> chizilmoqda
+                      </span>
+                    )}
                   </div>
                   <div className="text-[10px] text-ink-300/60 font-mono">
                     {visibleDevices.length} / {deviceIds.length} qurilma · {totalPoints} ta nuqta
@@ -711,19 +717,48 @@ export function DiffPage() {
                 <div className="flex items-center gap-0.5 p-0.5 rounded-md bg-[var(--bg-card)] border border-[var(--border)]">
                   <button onClick={() => zoom(0.6)} className="w-6 h-6 rounded flex items-center justify-center text-ink-300 hover:text-[var(--text)] hover:bg-[var(--bg-subtle)] transition-colors"><ZoomIn size={12} /></button>
                   <button onClick={() => zoom(1.7)} className="w-6 h-6 rounded flex items-center justify-center text-ink-300 hover:text-[var(--text)] hover:bg-[var(--bg-subtle)] transition-colors"><ZoomOut size={12} /></button>
-                  <button onClick={() => setPreset(365 * 86400)} className="w-6 h-6 rounded flex items-center justify-center text-ink-300 hover:text-[var(--text)] hover:bg-[var(--bg-subtle)] transition-colors"><RotateCcw size={11} /></button>
+                  <button onClick={() => setPreset('1y')} className="w-6 h-6 rounded flex items-center justify-center text-ink-300 hover:text-[var(--text)] hover:bg-[var(--bg-subtle)] transition-colors"><RotateCcw size={11} /></button>
                 </div>
 
                 <div className="flex items-center gap-0.5 p-0.5 rounded-md bg-[var(--bg-card)] border border-[var(--border)]">
-                  {PRESETS.map(p => (
+                  {RANGE_PRESETS.map(p => (
                     <button
-                      key={p.label}
-                      onClick={() => setPreset(p.sec)}
-                      className="px-2 h-6 rounded text-[10px] font-medium text-ink-300 hover:text-[var(--text)] hover:bg-[var(--bg-subtle)] transition-colors"
+                      key={p.value}
+                      onClick={() => setPreset(p.value)}
+                      className={`
+                        px-2 h-6 rounded text-[10px] font-medium transition-colors
+                        ${activeRange === p.value
+                          ? 'bg-[var(--electric)] text-white shadow-[0_0_16px_rgba(41,121,255,0.35)] ring-1 ring-[var(--electric-light)]/40'
+                          : 'text-ink-300 hover:text-[var(--text)] hover:bg-[var(--bg-subtle)]'
+                        }
+                      `}
                     >
-                      {p.label}
+                      {p.shortLabel}
                     </button>
                   ))}
+                </div>
+
+                <div className="flex items-center gap-1.5 rounded-md bg-[var(--bg-card)] border border-[var(--border)] px-2 py-1">
+                  <label className="flex items-center gap-1 text-[10px] text-ink-300">
+                    Dan
+                    <input
+                      type="datetime-local"
+                      step={1}
+                      value={toLocalInputValue(fromTs)}
+                      onChange={e => setCustomFrom(e.target.value)}
+                      className="h-6 w-[155px] rounded bg-[var(--bg-base)] border border-[var(--border)] px-1.5 text-[10px] text-[var(--text)] focus:outline-none focus:ring-1 focus:ring-[var(--electric)]/40"
+                    />
+                  </label>
+                  <label className="flex items-center gap-1 text-[10px] text-ink-300">
+                    Gacha
+                    <input
+                      type="datetime-local"
+                      step={1}
+                      value={toLocalInputValue(toTs)}
+                      readOnly
+                      className="h-6 w-[155px] rounded bg-[var(--bg-base)] border border-[var(--electric)]/30 px-1.5 text-[10px] text-[var(--text)]"
+                    />
+                  </label>
                 </div>
               </div>
             </div>

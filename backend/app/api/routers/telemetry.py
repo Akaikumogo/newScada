@@ -82,20 +82,25 @@ async def get_live(
 # ──────────────────────────────────────────────
 
 RANGE_DELTAS = {
+    "15m": timedelta(minutes=15),
     "1h":  timedelta(hours=1),
     "6h":  timedelta(hours=6),
-    "24h": timedelta(hours=24),
-    "7d":  timedelta(days=7),
+    "1d":  timedelta(days=1),
+    "1w":  timedelta(days=7),
+    "1mo": timedelta(days=30),
+    "3mo": timedelta(days=90),
+    "1y":  timedelta(days=365),
 }
 
 MAX_POINTS = 1000  # down-sample guard
+RANGE_PATTERN = "^(15m|1h|6h|1d|1w|1mo|3mo|1y)$"
 
 
 @router.get("/history", response_model=list[RecordOut])
 async def get_history(
     device_id: int = Query(...),
     signal_name: str = Query(...),
-    range: str = Query("1h", pattern="^(1h|6h|24h|7d)$"),
+    range: str = Query("1h", pattern=RANGE_PATTERN),
     db: AsyncSession = Depends(get_db),
 ):
     delta = RANGE_DELTAS[range]
@@ -126,7 +131,7 @@ PAGE_SIZE = 100
 async def get_history_page(
     device_id: int = Query(...),
     signal_name: str = Query(...),
-    range: str = Query("1h", pattern="^(1h|6h|24h|7d)$"),
+    range: str = Query("1h", pattern=RANGE_PATTERN),
     cursor: int | None = Query(None, description="Oxirgi ko'rilgan record id (keyingi sahifa uchun)"),
     limit: int = Query(PAGE_SIZE, ge=1, le=500),
     db: AsyncSession = Depends(get_db),

@@ -10,6 +10,16 @@ import {
 } from 'lucide-react'
 import { format } from 'date-fns'
 import { telemetryApi, type RangePoint } from '@/lib/api'
+import {
+  RANGE_PRESETS,
+  fromLocalInputValue,
+  presetMs,
+  roundedQueryDate,
+  toLocalInputValue,
+  type HistoryRange,
+} from '@/lib/timeRange'
+import { useChunkedRangeRows } from '@/hooks/useChunkedRangeRows'
+import { useLiveNow } from '@/hooks/useLiveNow'
 import type { Signal } from '@/types'
 
 // ──────────────────────────────────────────────────
@@ -197,9 +207,10 @@ export function TradingChart({
   const [fromTs, setFromTs] = useState<Date>(() =>
     initialFromTs ?? new Date(Date.now() - 365 * 86400_000)
   )
-  const [toTs, setToTs] = useState<Date>(() =>
-    initialToTs ?? new Date()
-  )
+  const liveNow = useLiveNow(!initialToTs)
+  const toTs = initialToTs ?? liveNow
+  const queryToTs = useMemo(() => roundedQueryDate(toTs), [toTs])
+  const [activeRange, setActiveRange] = useState<HistoryRange | null>('1y')
 
   // ── Visibility (first 8 by default) ──────────────
   const [visibility, setVisibility] = useState<Record<string, boolean>>(() => {
@@ -223,11 +234,11 @@ export function TradingChart({
 
   // ── Fetch via batched endpoint (device_id only) ──
   const { data: dataMap = {}, isLoading, isError, isFetching } = useQuery({
-    queryKey: ['range-multi', deviceId, fromTs.getTime(), toTs.getTime()],
+    queryKey: ['range-multi', deviceId, fromTs.getTime(), queryToTs.getTime()],
     queryFn:  ({ signal: abortSignal }) => telemetryApi.rangeMulti({
       device_id: deviceId,
       from_ts:   fromTs,
-      to_ts:     toTs,
+      to_ts:     queryToTs,
     }, abortSignal),
     staleTime: 30_000,
     placeholderData: (prev) => prev,
@@ -235,17 +246,9 @@ export function TradingChart({
   })
 
   // ── Merge into row-oriented chart data ───────────
-  const chartData = useMemo(() => {
-    const rows = new Map<number, Record<string, any>>()
-    for (const [name, points] of Object.entries(dataMap as Record<string, RangePoint[]>)) {
-      for (const p of points) {
-        const t = new Date(p.ts).getTime()
-        if (!rows.has(t)) rows.set(t, { ts: t })
-        rows.get(t)![name] = p.avg
-      }
-    }
-    return Array.from(rows.values()).sort((a, b) => a.ts - b.ts)
-  }, [dataMap])
+  const { rows: chartData, isProcessing: isChunking } = useChunkedRangeRows(
+    dataMap as Record<string, RangePoint[]>,
+  )
 
   // ── Apply normalization (each signal → 0..100%) ──
   const displayData = useMemo(() => {
@@ -293,17 +296,25 @@ export function TradingChart({
   }, [signals, legendQuery])
 
   // ── Range presets ────────────────────────────────
-  const setPreset = useCallback((sec: number) => {
-    setToTs(new Date())
-    setFromTs(new Date(Date.now() - sec * 1000))
+  const setPreset = useCallback((range: HistoryRange) => {
+    setActiveRange(range)
+    setFromTs(new Date(Date.now() - presetMs(range)))
+  }, [])
+
+  const setCustomFrom = useCallback((value: string) => {
+    const next = fromLocalInputValue(value)
+    if (!next) return
+    setActiveRange(null)
+    setFromTs(next)
   }, [])
 
   const zoom = useCallback((factor: number) => {
     const center = (fromTs.getTime() + toTs.getTime()) / 2
     const span   = toTs.getTime() - fromTs.getTime()
     const newSpan = Math.max(60_000, Math.min(2 * 365 * 86400_000, span * factor))
-    setFromTs(new Date(center - newSpan / 2))
-    setToTs(new Date(center + newSpan / 2))
+    const nextTo = Math.min(Date.now(), center + newSpan / 2)
+    setActiveRange(null)
+    setFromTs(new Date(nextTo - newSpan))
   }, [fromTs, toTs])
 
   // ── Ctrl/Shift + wheel zoom ──────────────────────
@@ -330,17 +341,6 @@ export function TradingChart({
   const totalPoints  = chartData.length
   const spanMs       = toTs.getTime() - fromTs.getTime()
 
-  const PRESETS = [
-    { label: '15m', sec: 15 * 60 },
-    { label: '1h',  sec: 3600 },
-    { label: '6h',  sec: 6 * 3600 },
-    { label: '1d',  sec: 86400 },
-    { label: '1w',  sec: 7 * 86400 },
-    { label: '1mo', sec: 30 * 86400 },
-    { label: '3mo', sec: 90 * 86400 },
-    { label: '1y',  sec: 365 * 86400 },
-  ]
-
   return (
     <div ref={containerRef} className="glass-card rounded-2xl overflow-hidden flex flex-col h-full">
       {/* ── Header ──────────────────────────────────── */}
@@ -354,6 +354,11 @@ export function TradingChart({
               {isFetching && !isLoading && (
                 <span className="text-[10px] text-[var(--electric)] flex items-center gap-1">
                   <Loader2 size={9} className="animate-spin" /> yangilanmoqda
+                </span>
+              )}
+              {isChunking && (
+                <span className="text-[10px] text-[#FFAA00] flex items-center gap-1">
+                  <Loader2 size={9} className="animate-spin" /> chizilmoqda
                 </span>
               )}
             </div>
@@ -398,7 +403,7 @@ export function TradingChart({
               <ZoomOut size={12} />
             </button>
             <button
-              onClick={() => setPreset(365 * 86400)}
+              onClick={() => setPreset('1y')}
               className="w-6 h-6 rounded flex items-center justify-center text-ink-300 hover:text-[var(--text)] hover:bg-[var(--bg-subtle)] transition-colors"
               title="Hammasini ko'rsatish"
             >
@@ -408,19 +413,45 @@ export function TradingChart({
 
           {/* Presets */}
           <div className="flex items-center gap-0.5 p-0.5 rounded-md bg-[var(--bg-card)] border border-[var(--border)]">
-            {PRESETS.map(p => (
+            {RANGE_PRESETS.map(p => (
               <button
-                key={p.label}
-                onClick={() => setPreset(p.sec)}
-                className="
+                key={p.value}
+                onClick={() => setPreset(p.value)}
+                className={`
                   px-2 h-6 rounded text-[10px] font-medium
-                  text-ink-300 hover:text-[var(--text)] hover:bg-[var(--bg-subtle)]
                   transition-colors
-                "
+                  ${activeRange === p.value
+                    ? 'bg-[var(--electric)] text-white shadow-[0_0_16px_rgba(41,121,255,0.35)] ring-1 ring-[var(--electric-light)]/40'
+                    : 'text-ink-300 hover:text-[var(--text)] hover:bg-[var(--bg-subtle)]'
+                  }
+                `}
               >
-                {p.label}
+                {p.shortLabel}
               </button>
             ))}
+          </div>
+
+          <div className="flex items-center gap-1.5 rounded-md bg-[var(--bg-card)] border border-[var(--border)] px-2 py-1">
+            <label className="flex items-center gap-1 text-[10px] text-ink-300">
+              Dan
+              <input
+                type="datetime-local"
+                step={1}
+                value={toLocalInputValue(fromTs)}
+                onChange={e => setCustomFrom(e.target.value)}
+                className="h-6 w-[155px] rounded bg-[var(--bg-base)] border border-[var(--border)] px-1.5 text-[10px] text-[var(--text)] focus:outline-none focus:ring-1 focus:ring-[var(--electric)]/40"
+              />
+            </label>
+            <label className="flex items-center gap-1 text-[10px] text-ink-300">
+              Gacha
+              <input
+                type="datetime-local"
+                step={1}
+                value={toLocalInputValue(toTs)}
+                readOnly
+                className="h-6 w-[155px] rounded bg-[var(--bg-base)] border border-[var(--electric)]/30 px-1.5 text-[10px] text-[var(--text)]"
+              />
+            </label>
           </div>
         </div>
       </div>
