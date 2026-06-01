@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom'
 import { DatabaseZap, Zap, Moon, Sun, Wifi, WifiOff, Loader2, GitCompare } from 'lucide-react'
 import { useTheme } from '@/hooks/useTheme'
 import { useDispatcherStore } from '@/store/dispatcher'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 import type { Branch, Substation } from '@/types'
 
 // ── WS connection indicator ───────────────────────
@@ -18,7 +20,10 @@ function WsIndicator() {
   const Icon = cfg.icon
 
   return (
-    <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[var(--bg-card)] border border-[var(--border)]">
+    <Badge
+      variant={wsState === 'connected' ? 'online' : wsState === 'connecting' ? 'warning' : 'offline'}
+      className="gap-1.5 px-3 py-1.5"
+    >
       <span className="relative flex items-center justify-center">
         <Icon size={12} className={`${cfg.color} ${cfg.spin ? 'animate-spin' : ''}`} />
         {wsState === 'connected' && (
@@ -41,7 +46,7 @@ function WsIndicator() {
           {cfg.label}
         </motion.span>
       </AnimatePresence>
-    </div>
+    </Badge>
   )
 }
 
@@ -73,8 +78,9 @@ export function TopBar({ branches, substations, onBranchChange }: Props) {
       className="
         fixed top-0 left-0 right-0 z-50 h-14
         flex items-center justify-between px-4 gap-4
-        bg-[var(--bg-elevated)]/85 backdrop-blur-xl
+        bg-[var(--bg-elevated)] backdrop-blur-xl
         border-b border-[var(--border)]
+        shadow-[0_8px_28px_rgba(0,0,0,0.18)]
       "
       initial={{ y: -14, opacity: 0 }}
       animate={{ y: 0, opacity: 1 }}
@@ -87,7 +93,7 @@ export function TopBar({ branches, substations, onBranchChange }: Props) {
         whileHover={{ scale: 1.02 }}
         whileTap={{ scale: 0.97 }}
       >
-        <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-[#2979FF] to-[#1248C0] flex items-center justify-center shadow-[0_0_14px_rgba(41,121,255,0.45)]">
+        <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[var(--electric)] to-[#1554B8] flex items-center justify-center shadow-[0_0_14px_rgba(47,125,246,0.34)]">
           <Zap size={16} className="text-white" fill="white" />
         </div>
         <div className="leading-tight">
@@ -145,11 +151,9 @@ export function TopBar({ branches, substations, onBranchChange }: Props) {
       <div className="flex items-center gap-2.5 flex-shrink-0">
         {/* Online/total counter */}
         {totalCount > 0 && (
-          <motion.div
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[var(--bg-card)] border border-[var(--border)]"
-            initial={{ opacity: 0, scale: 0.85 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ delay: 0.3 }}
+          <Badge
+            variant="online"
+            className="gap-1.5 px-3 py-1.5"
           >
             <motion.span
               key={onlineCount}
@@ -162,23 +166,24 @@ export function TopBar({ branches, substations, onBranchChange }: Props) {
             </motion.span>
             <span className="text-[11px] text-ink-300">/ {totalCount}</span>
             <Wifi size={11} className="text-[#00D68F]" />
-          </motion.div>
+          </Badge>
         )}
 
         {/* WS indicator */}
         <WsIndicator />
 
+        <Button
+          asChild
+          variant="outline"
+          size="sm"
+          className="h-8 rounded-lg text-xs text-ink-200"
+        >
         <motion.button
           onClick={() => {
             const subId = useDispatcherStore.getState().selectedSubstationId
             navigate(subId ? `/substation/${subId}/diff` : '/diff')
           }}
-          className="
-            h-8 px-3 rounded-xl flex items-center gap-1.5
-            bg-[var(--bg-card)] border border-[var(--border)]
-            text-ink-200 hover:text-[var(--text)]
-            hover:border-[var(--border-hover)] transition-all text-[12px]
-          "
+          aria-label="Signal diff sahifasini ochish"
           whileHover={{ scale: 1.03 }}
           whileTap={{ scale: 0.96 }}
           title="Tanlangan PS ichidagi qurilmalarni taqqoslash"
@@ -186,31 +191,35 @@ export function TopBar({ branches, substations, onBranchChange }: Props) {
           <GitCompare size={13} />
           Diff
         </motion.button>
+        </Button>
 
+        <Button
+          asChild
+          variant="outline"
+          size="sm"
+          className="h-8 rounded-lg text-xs text-ink-200"
+        >
         <motion.button
           onClick={() => navigate('/realtime')}
-          className="
-            h-8 px-3 rounded-xl flex items-center gap-1.5
-            bg-[var(--bg-card)] border border-[var(--border)]
-            text-ink-200 hover:text-[var(--text)]
-            hover:border-[var(--border-hover)] transition-all text-[12px]
-          "
+          aria-label="Redis realtime sahifasini ochish"
           whileHover={{ scale: 1.03 }}
           whileTap={{ scale: 0.96 }}
         >
           <DatabaseZap size={13} />
           Redis
         </motion.button>
+        </Button>
 
         {/* Theme toggle */}
+        <Button
+          asChild
+          variant="outline"
+          size="compactIcon"
+          className="text-ink-200"
+        >
         <motion.button
           onClick={toggle}
-          className="
-            w-8 h-8 rounded-xl flex items-center justify-center
-            bg-[var(--bg-card)] border border-[var(--border)]
-            text-ink-200 hover:text-[var(--text)]
-            hover:border-[var(--border-hover)] transition-all
-          "
+          aria-label={theme === 'dark' ? 'Light theme yoqish' : 'Dark theme yoqish'}
           whileHover={{ scale: 1.05 }}
           whileTap={{ scale: 0.9 }}
         >
@@ -226,6 +235,7 @@ export function TopBar({ branches, substations, onBranchChange }: Props) {
             </motion.span>
           </AnimatePresence>
         </motion.button>
+        </Button>
       </div>
     </motion.header>
   )

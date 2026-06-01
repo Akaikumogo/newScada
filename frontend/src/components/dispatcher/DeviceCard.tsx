@@ -103,7 +103,7 @@ export const DeviceCard = memo(function DeviceCard({ device, index }: Props) {
       }}
       onClick={() => openDetail()}
       className={`
-        glass-card gradient-border rounded-2xl overflow-hidden
+        scada-panel overflow-hidden
         flex flex-col select-none cursor-pointer group/card
         ${getStatusBorder(status)}
       `}
@@ -131,7 +131,7 @@ export const DeviceCard = memo(function DeviceCard({ device, index }: Props) {
 
         <div className="flex items-start justify-between gap-2 relative z-10">
           <div className="min-w-0">
-            <h3 className="text-[15px] font-semibold text-[var(--text)] truncate leading-tight flex items-center gap-1.5">
+            <h3 className="text-[14px] font-semibold text-[var(--text)] truncate leading-tight flex items-center gap-1.5">
               {device.name}
               <ArrowUpRight
                 size={14}
@@ -150,18 +150,18 @@ export const DeviceCard = memo(function DeviceCard({ device, index }: Props) {
 
         {/* Signal count + model */}
         <div className="mt-1.5 relative z-10 flex items-center gap-2">
-          <span className="text-[11px] text-ink-300/60 font-mono">
+          <span className="text-[10px] uppercase tracking-wide text-ink-300/60 font-mono">
             model #{device.model_id}
           </span>
           <span className="text-ink-300/30">·</span>
-          <span className="text-[11px] text-ink-300/60">
+          <span className="text-[10px] uppercase tracking-wide text-ink-300/60">
             {activeCount}/{totalCount} signal
           </span>
         </div>
       </div>
 
       {/* ── Signals ────────────────────────────────── */}
-      <div className="flex-1 overflow-hidden">
+      <div className="flex-1 overflow-hidden bg-[var(--bg-elevated)]/20">
         {status === 'offline' && !sortedSignals.length ? (
           <div className="flex flex-col items-center justify-center py-8 gap-2">
             <WifiOff size={24} className="text-[#FF3D71]/60" />
@@ -193,7 +193,7 @@ export const DeviceCard = memo(function DeviceCard({ device, index }: Props) {
       </div>
 
       {/* ── Footer ─────────────────────────────────── */}
-      <div className="px-4 py-2.5 border-t border-[var(--border)] flex items-center justify-between">
+      <div className="px-4 py-2.5 border-t border-[var(--border)] flex items-center justify-between bg-[var(--bg-elevated)]/35">
         <div className="flex items-center gap-1.5 text-ink-300">
           <Clock size={10} />
           <span className="text-[11px]">

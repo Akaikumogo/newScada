@@ -9,8 +9,8 @@ from sqlalchemy import insert, select
 
 from app.core.config import settings
 from app.infrastructure.cache.redis_cache import (
-    publish_live,
-    set_signal_value,
+    publish_many_live,
+    set_many_signal_values,
 )
 # NOTE: device online/offline status is owned exclusively by PingMonitor.
 # RecordCollector only persists values + broadcasts signal_update events.
@@ -20,6 +20,7 @@ from app.infrastructure.events.bus import bus
 from app.infrastructure.iec104 import Iec104Config, SignalValue, read_live_values
 
 logger = logging.getLogger(__name__)
+CONFIG_CACHE_SECONDS = 10.0
 
 
 @dataclass(frozen=True)
@@ -39,6 +40,9 @@ class RecordCollector:
         self._cycle = 0
         self._last_inserted = 0
         self._last_errors = 0
+        self._config_loaded_at = 0.0
+        self._cached_devices: list[Device] = []
+        self._cached_by_device: dict[int, list[DeviceSignal]] = {}
 
     @property
     def is_running(self) -> bool:
@@ -93,25 +97,8 @@ class RecordCollector:
 
     async def collect_once(self) -> None:
         self._cycle += 1
+        devices, by_device, signal_count = await self._get_poll_config()
         async with AsyncSessionFactory() as session:
-            devices = (
-                await session.execute(
-                    select(Device).where(Device.protocol == "iec104").order_by(Device.id)
-                )
-            ).scalars().all()
-
-            signals = (
-                await session.execute(
-                    select(DeviceSignal)
-                    .where(DeviceSignal.active.is_(True))
-                    .order_by(DeviceSignal.device_id, DeviceSignal.register_code)
-                )
-            ).scalars().all()
-
-            by_device: dict[int, list[DeviceSignal]] = {}
-            for signal in signals:
-                by_device.setdefault(signal.device_id, []).append(signal)
-
             semaphore = asyncio.Semaphore(settings.IEC_RECORD_MAX_PARALLEL_POLLS)
             results = await asyncio.gather(
                 *[
@@ -120,7 +107,18 @@ class RecordCollector:
                 ]
             )
 
-            rows = [row for result in results for row in result.records]
+            rows = [
+                {
+                    "device_id": row["device_id"],
+                    "signal_name": row["signal_name"],
+                    "value": row["value"],
+                    "quality": row["quality"],
+                    "captured_at": row["captured_at"],
+                }
+                for result in results
+                for row in result.records
+                if row.get("persist", True)
+            ]
             await self._publish_realtime(results)
             if rows:
                 await session.execute(insert(Record), rows)
@@ -136,7 +134,7 @@ class RecordCollector:
                 "RecordCollector cycle=%s devices=%s active_signals=%s read=%s inserted=%s errors=%s",
                 self._cycle,
                 len(devices),
-                len(signals),
+                signal_count,
                 sum(result.read_count for result in results),
                 len(rows),
                 len(errors),
@@ -149,6 +147,42 @@ class RecordCollector:
                     result.port,
                     result.error,
                 )
+
+    async def _get_poll_config(self) -> tuple[list[Device], dict[int, list[DeviceSignal]], int]:
+        now = asyncio.get_running_loop().time()
+        if self._cached_devices and now - self._config_loaded_at < CONFIG_CACHE_SECONDS:
+            return (
+                self._cached_devices,
+                self._cached_by_device,
+                sum(len(items) for items in self._cached_by_device.values()),
+            )
+
+        async with AsyncSessionFactory() as session:
+            devices = (
+                await session.execute(
+                    select(Device).where(Device.protocol == "iec104").order_by(Device.id)
+                )
+            ).scalars().all()
+
+            signals = (
+                await session.execute(
+                    select(DeviceSignal)
+                    .where(
+                        (DeviceSignal.active.is_(True))
+                        | (DeviceSignal.only_realtime.is_(True))
+                    )
+                    .order_by(DeviceSignal.device_id, DeviceSignal.register_code)
+                )
+            ).scalars().all()
+
+        by_device: dict[int, list[DeviceSignal]] = {}
+        for signal in signals:
+            by_device.setdefault(signal.device_id, []).append(signal)
+
+        self._cached_devices = list(devices)
+        self._cached_by_device = by_device
+        self._config_loaded_at = now
+        return self._cached_devices, self._cached_by_device, len(signals)
 
     async def _read_device(
         self,
@@ -205,6 +239,10 @@ class RecordCollector:
         )
 
     async def _publish_realtime(self, results: list[DeviceReadResult]) -> None:
+        rows = [row for result in results if not result.error for row in result.records]
+        await set_many_signal_values(rows)
+
+        batch: list[dict] = []
         for result in results:
             if result.error:
                 continue
@@ -219,15 +257,10 @@ class RecordCollector:
                     "quality": record["quality"],
                     "ts": signal_ts,
                 }
-                await set_signal_value(
-                    device_id=record["device_id"],
-                    signal_name=record["signal_name"],
-                    value=record["value"],
-                    quality=record["quality"],
-                    ts=signal_ts,
-                )
-                await publish_live(message)
-                await bus.publish(message)
+                batch.append(message)
+        if batch:
+            await publish_many_live(batch)
+            await bus.publish({"type": "signal_batch", "items": batch})
 
     @staticmethod
     def _build_records(
@@ -249,6 +282,7 @@ class RecordCollector:
                     "value": float(value.value),
                     "quality": int(value.quality),
                     "captured_at": captured_at,
+                    "persist": bool(signal.active),
                 }
             )
         return rows

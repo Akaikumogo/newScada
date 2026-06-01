@@ -122,41 +122,41 @@ export const SignalRow = memo(function SignalRow({
   return (
     <tr
       className={`
-        group border-b border-[var(--border)] last:border-0
+        group border-b border-[var(--border)]/70 last:border-0
         cursor-pointer transition-colors duration-150
-        ${flashing ? 'signal-flash' : 'hover:bg-[var(--bg-subtle)]/40'}
+        ${flashing ? 'signal-flash' : 'hover:bg-[var(--bg-subtle)]/35'}
       `}
       onClick={onHistoryClick ? (e) => { e.stopPropagation(); onHistoryClick() } : undefined}
     >
       {/* Signal short name */}
-      <td className="py-2 pl-4 pr-2 w-14">
-        <span className="text-[13px] font-medium text-ink-200">{signalName}</span>
+      <td className="py-2.5 pl-4 pr-2 w-16">
+        <span className="text-[11px] font-semibold text-ink-200 font-mono">{signalName}</span>
       </td>
 
       {/* Signal title */}
-      <td className="py-2 pr-2">
-        <span className="text-[12px] text-ink-300 truncate block max-w-[120px]">{signalTitle}</span>
+      <td className="py-2.5 pr-2">
+        <span className="text-[11px] text-ink-300 truncate block max-w-[150px]">{signalTitle}</span>
       </td>
 
       {/* Value */}
-      <td className="py-2 pr-2 text-right">
-        <span className="mono-value text-[14px] font-medium text-[var(--text)]">
+      <td className="py-2.5 pr-2 text-right">
+        <span className="mono-value text-[15px] font-semibold text-[var(--text)] tabular-nums">
           <AnimatedNumber value={data?.value ?? null} />
         </span>
       </td>
 
       {/* Unit */}
-      <td className="py-2 pr-2 w-10">
-        <span className="text-[11px] text-ink-300">{unit}</span>
+      <td className="py-2.5 pr-2 w-10">
+        <span className="text-[10px] text-ink-300 font-mono">{unit}</span>
       </td>
 
       {/* Quality */}
-      <td className="py-2 pr-2 w-5">
+      <td className="py-2.5 pr-2 w-5">
         {data && <QualityDot quality={data.quality} />}
       </td>
 
       {/* History arrow */}
-      <td className="py-2 pr-3 w-5">
+      <td className="py-2.5 pr-3 w-5">
         <ChevronRight
           size={12}
           className="text-ink-300 opacity-0 group-hover:opacity-100 transition-opacity"

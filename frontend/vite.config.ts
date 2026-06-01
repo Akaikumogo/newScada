@@ -19,6 +19,7 @@ export default defineConfig({
           'vendor-charts': ['recharts'],
           'vendor-motion': ['framer-motion'],
           'vendor-flow':   ['@xyflow/react'],
+          'vendor-radix':  ['@radix-ui/react-slot', '@radix-ui/react-select'],
         },
       },
     },

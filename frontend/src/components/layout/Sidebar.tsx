@@ -86,15 +86,16 @@ export function Sidebar({ substations }: { substations: Substation[]; devices: R
     <aside
       className="
         fixed top-14 left-0 bottom-0 w-[240px] z-40
-        bg-[var(--bg-elevated)]/90 backdrop-blur-xl
+        bg-[var(--bg-elevated)] backdrop-blur-xl
         border-r border-[var(--border)]
         flex flex-col
+        shadow-[8px_0_28px_rgba(0,0,0,0.18)]
       "
     >
       {/* Substation list */}
-      <div className="flex-1 overflow-y-auto py-3 px-3 space-y-0.5">
+      <div className="flex-1 overflow-y-auto py-4 px-3 space-y-1">
         {/* Section label */}
-        <div className="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-ink-300/60 flex items-center justify-between">
+        <div className="px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-300/60 flex items-center justify-between">
           <span>Podstansiyalar</span>
           {substations.length > 0 && (
             <span className="text-ink-300/40">{substations.length}</span>
@@ -128,7 +129,7 @@ export function Sidebar({ substations }: { substations: Substation[]; devices: R
       </div>
 
       {/* Footer */}
-      <div className="px-4 py-3 border-t border-[var(--border)]">
+      <div className="px-4 py-3 border-t border-[var(--border)] bg-[var(--bg-card)]/40">
         <div className="flex items-center justify-between text-[10px] text-ink-300/40">
           <span>newSCADA Dispatcher</span>
           <span className={`flex items-center gap-1 ${

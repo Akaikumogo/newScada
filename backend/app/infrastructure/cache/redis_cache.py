@@ -36,6 +36,9 @@ class _MemStore:
     async def mget(self, *keys: str) -> list[str | None]:
         return [_mem_store.get(k) for k in keys]
 
+    async def mset(self, mapping: dict[str, str]) -> None:
+        _mem_store.update(mapping)
+
     async def keys(self, pattern: str) -> list[str]:
         # simple glob: "live:1:*" → starts-with prefix
         if pattern.endswith("*"):
@@ -115,6 +118,47 @@ async def set_signal_value(
     await r.set(key, payload, ex=settings.IEC_LIVE_CACHE_SECONDS)
 
 
+async def set_many_signal_values(records: list[dict]) -> None:
+    """Write many latest values in one Redis pipeline/mset operation."""
+    if not records:
+        return
+    r = get_redis()
+    mapping = {
+        f"live:{row['device_id']}:{row['signal_name']}": json.dumps({
+            "value": row["value"],
+            "quality": row["quality"],
+            "ts": row["captured_at"].isoformat(),
+        })
+        for row in records
+    }
+    if _redis_available and hasattr(r, "pipeline"):
+        from app.core.config import settings
+        pipe = r.pipeline(transaction=False)
+        for key, payload in mapping.items():
+            pipe.set(key, payload, ex=settings.IEC_LIVE_CACHE_SECONDS)
+        await pipe.execute()
+        return
+    if hasattr(r, "mset"):
+        await r.mset(mapping)
+        return
+    for key, payload in mapping.items():
+        await r.set(key, payload)
+
+
+async def get_many_signal_values(keys: list[tuple[int, str]]) -> dict[tuple[int, str], Any]:
+    """Read exact live keys with one MGET instead of Redis KEYS scans."""
+    if not keys:
+        return {}
+    r = get_redis()
+    redis_keys = [f"live:{device_id}:{signal_name}" for device_id, signal_name in keys]
+    values = await r.mget(*redis_keys)
+    result: dict[tuple[int, str], Any] = {}
+    for key, raw in zip(keys, values):
+        if raw:
+            result[key] = json.loads(raw)
+    return result
+
+
 async def get_signal_value(device_id: int, signal_name: str) -> dict | None:
     r = get_redis()
     raw = await r.get(f"live:{device_id}:{signal_name}")
@@ -176,4 +220,19 @@ async def publish_live(message: dict) -> None:
     """Publish a live update message (real Redis only)."""
     if _redis_available:
         r = get_redis()
+        await r.publish(CHANNEL_LIVE, json.dumps(message))
+
+
+async def publish_many_live(messages: list[dict]) -> None:
+    """Publish many live update messages with one Redis pipeline."""
+    if not _redis_available or not messages:
+        return
+    r = get_redis()
+    if hasattr(r, "pipeline"):
+        pipe = r.pipeline(transaction=False)
+        for message in messages:
+            pipe.publish(CHANNEL_LIVE, json.dumps(message))
+        await pipe.execute()
+        return
+    for message in messages:
         await r.publish(CHANNEL_LIVE, json.dumps(message))

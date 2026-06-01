@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
 import { useQuery } from '@tanstack/react-query'
-import { Activity, DatabaseZap, Search, Wifi, WifiOff } from 'lucide-react'
+import { Activity, DatabaseZap, RefreshCw, Search, Wifi, WifiOff } from 'lucide-react'
 import { deviceApi, telemetryApi } from '@/lib/api'
 import { useDispatcherStore } from '@/store/dispatcher'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import type { Device, Signal } from '@/types'
 
 function formatValue(value: number | null | undefined) {
@@ -106,8 +108,8 @@ export function RealtimeRedisPage() {
             <div>
               <h1 className="text-[18px] font-semibold text-[var(--text)]">Redis realtime</h1>
               <div className="flex items-center gap-3 mt-0.5 text-[12px] text-ink-300">
-                <span>{rows.length} ta active signal</span>
-                <span>{onlineCount} online device</span>
+                <span className="metric-tile px-2.5 py-1">{rows.length} ta active signal</span>
+                <span className="metric-tile px-2.5 py-1">{onlineCount} online device</span>
                 <span className={wsState === 'connected' ? 'text-[#00D68F]' : 'text-[#FFAA00]'}>
                   WS {wsState}
                 </span>
@@ -118,26 +120,29 @@ export function RealtimeRedisPage() {
           <div className="flex items-center gap-2">
             <div className="relative">
               <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-300" />
-              <input
+              <Input
                 value={query}
                 onChange={e => setQuery(e.target.value)}
                 placeholder="Device, IOA, signal..."
-                className="h-9 w-[280px] pl-9 pr-3 rounded-lg bg-[var(--bg-card)] border border-[var(--border)] text-[13px] text-[var(--text)] focus:outline-none focus:ring-1 focus:ring-[var(--electric)]/40"
+                className="h-9 w-[280px] pl-9 pr-3 text-[13px]"
               />
             </div>
-            <button
+            <Button
               onClick={() => refetch()}
-              className="h-9 px-3 rounded-lg bg-[var(--bg-card)] border border-[var(--border)] text-[12px] text-ink-200 hover:text-[var(--text)]"
+              variant="outline"
+              size="sm"
+              className="h-9"
             >
+              <RefreshCw size={13} />
               Snapshot
-            </button>
+            </Button>
           </div>
         </div>
       </div>
 
       <div className="flex-1 overflow-auto p-6">
         <motion.div
-          className="rounded-lg border border-[var(--border)] bg-[var(--bg-card)] overflow-hidden"
+          className="scada-panel overflow-hidden"
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
         >

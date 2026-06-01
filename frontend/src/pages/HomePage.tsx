@@ -14,7 +14,7 @@ function SubstationCard({ sub, index }: { sub: Substation; index: number }) {
   return (
     <motion.button
       onClick={() => navigate(`/substation/${sub.id}`)}
-      className="glass-card gradient-border rounded-2xl p-5 text-left flex flex-col gap-4 group"
+      className="scada-panel p-5 text-left flex flex-col gap-4 group"
       initial={{ opacity: 0, y: 20, scale: 0.97 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
       transition={{ delay: index * 0.07, duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
@@ -90,12 +90,12 @@ export function HomePage({ substations }: Props) {
   return (
     <div className="p-6">
       <motion.div
-        className="mb-6"
+        className="mb-6 scada-panel px-5 py-4"
         initial={{ opacity: 0, y: -8 }}
         animate={{ opacity: 1, y: 0 }}
       >
-        <h1 className="text-[20px] font-semibold text-[var(--text)]">Podstansiyalar</h1>
-        <p className="text-[13px] text-ink-300 mt-1">{substations.length} ta podstansiya mavjud</p>
+        <h1 className="text-[20px] font-semibold text-[var(--text)]">Dispatcher boshqaruv paneli</h1>
+        <p className="text-[13px] text-ink-300 mt-1">{substations.length} ta podstansiya monitoringga tayyor</p>
       </motion.div>
 
       <div

@@ -1,4 +1,5 @@
 import { memo } from 'react'
+import { Badge } from '@/components/ui/badge'
 import type { DeviceStatus } from '@/types'
 
 const STATUS_MAP: Record<DeviceStatus, {
@@ -25,12 +26,14 @@ export const StatusBadge = memo(function StatusBadge({ status, size = 'md' }: Pr
   const dotSize = size === 'sm' ? 'w-1.5 h-1.5' : 'w-2 h-2'
 
   return (
-    <div
-      className={`
-        inline-flex items-center gap-1.5 rounded-full px-2.5 py-1
-        ${cfg.bg} ${cfg.color}
-        border border-current/10 text-xs font-medium
-      `}
+    <Badge
+      variant={
+        status === 'online' ? 'online' :
+        status === 'offline' ? 'offline' :
+        status === 'warning' ? 'warning' :
+        'outline'
+      }
+      className={`gap-1.5 px-2.5 py-1 text-[11px] ${cfg.color}`}
     >
       {/* Dot with optional CSS-only pulse */}
       <span className="relative flex items-center justify-center">
@@ -40,7 +43,7 @@ export const StatusBadge = memo(function StatusBadge({ status, size = 'md' }: Pr
         )}
       </span>
       <span>{cfg.label}</span>
-    </div>
+    </Badge>
   )
 })
 

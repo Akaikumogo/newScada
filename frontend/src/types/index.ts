@@ -82,6 +82,7 @@ export interface LiveDeviceData {
 
 export type WsMessage =
   | { type: 'signal_update'; device_id: number; signal_name: string; value: number; quality: number; ts: string }
+  | { type: 'signal_batch'; items: Array<{ type: 'signal_update'; device_id: number; signal_name: string; value: number; quality: number; ts: string }> }
   | { type: 'device_status'; device_id: number; online: boolean; last_seen: string }
   | { type: 'ping' }
 

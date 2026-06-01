@@ -93,6 +93,41 @@ export interface RangePoint {
   count: number
 }
 
+export interface DeviceActivityBucket {
+  ts: string
+  active: boolean
+  record_count: number
+}
+
+export interface DeviceActivityOutage {
+  from_ts: string
+  to_ts: string
+  duration_sec: number
+}
+
+export interface DeviceActivityDevice {
+  device_id: number
+  name: string
+  host: string
+  port: number
+  bucket_count: number
+  active_buckets: number
+  uptime_percent: number
+  downtime_percent: number
+  total_records: number
+  first_seen: string | null
+  last_seen: string | null
+  outages: DeviceActivityOutage[]
+  timeline: DeviceActivityBucket[]
+}
+
+export interface DeviceActivityResponse {
+  from_ts: string
+  to_ts: string
+  bucket_sec: number
+  devices: DeviceActivityDevice[]
+}
+
 export const telemetryApi = {
   /** Latest live values (REST fallback, WS is primary) */
   live: (substationId?: number, signal?: AbortSignal) =>
@@ -220,5 +255,24 @@ export const telemetryApi = {
     if (params.cursor != null) qs.set('cursor', String(params.cursor))
     if (params.limit  != null) qs.set('limit',  String(params.limit))
     return request<HistoryPoint[]>(`/telemetry/history/page?${qs}`, { signal })
+  },
+
+  deviceActivity: (
+    params: {
+      from_ts: Date | string
+      to_ts: Date | string
+      substation_id?: number
+      device_id?: number
+      bucket_sec?: number
+    },
+    signal?: AbortSignal,
+  ) => {
+    const qs = new URLSearchParams()
+    qs.set('from_ts', params.from_ts instanceof Date ? params.from_ts.toISOString() : params.from_ts)
+    qs.set('to_ts', params.to_ts instanceof Date ? params.to_ts.toISOString() : params.to_ts)
+    if (params.substation_id != null) qs.set('substation_id', String(params.substation_id))
+    if (params.device_id != null) qs.set('device_id', String(params.device_id))
+    if (params.bucket_sec != null) qs.set('bucket_sec', String(params.bucket_sec))
+    return request<DeviceActivityResponse>(`/telemetry/device-activity?${qs}`, { signal })
   },
 }

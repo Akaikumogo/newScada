@@ -143,6 +143,7 @@ class Record(Base):
     __tablename__ = "record"
     __table_args__ = (
         Index("ix_record_device_signal_time", "device_id", "signal_name", "captured_at"),
+        Index("ix_record_device_time", "device_id", "captured_at"),
     )
 
     id:          Mapped[int]      = mapped_column(BigInteger, primary_key=True)

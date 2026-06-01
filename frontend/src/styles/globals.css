@@ -1,4 +1,3 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -7,17 +6,39 @@
    CSS Design Tokens — Dark (default) / Light
 ═══════════════════════════════════════════════════════════════ */
 :root {
+  color-scheme: dark;
+  --background: 222 47% 5%;
+  --foreground: 224 42% 94%;
+  --card: 224 38% 8%;
+  --card-foreground: 224 42% 94%;
+  --popover: 224 38% 8%;
+  --popover-foreground: 224 42% 94%;
+  --primary: 216 83% 57%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 224 28% 16%;
+  --secondary-foreground: 224 42% 94%;
+  --muted: 224 25% 14%;
+  --muted-foreground: 226 18% 64%;
+  --accent: 221 45% 17%;
+  --accent-foreground: 218 85% 78%;
+  --destructive: 347 100% 62%;
+  --destructive-foreground: 0 0% 100%;
+  --border-hsl: 228 28% 18%;
+  --input: 228 28% 18%;
+  --ring: 216 83% 57%;
+  --radius: 0.5rem;
+
   /* Backgrounds */
-  --bg-base:        #040610;
-  --bg-elevated:    #060812;
-  --bg-card:        #0C0F1E;
-  --bg-card-hover:  #141728;
-  --bg-subtle:      #1E2240;
+  --bg-base:        #050814;
+  --bg-elevated:    #080C18;
+  --bg-card:        #0D1324;
+  --bg-card-hover:  #151C30;
+  --bg-subtle:      #202942;
 
   /* Borders */
-  --border:         rgba(30, 34, 64, 0.9);
-  --border-hover:   rgba(41, 121, 255, 0.30);
-  --border-active:  rgba(41, 121, 255, 0.60);
+  --border:         rgba(64, 76, 114, 0.56);
+  --border-hover:   rgba(66, 135, 245, 0.34);
+  --border-active:  rgba(66, 135, 245, 0.62);
 
   /* Text */
   --text:           #E8EBF8;
@@ -25,9 +46,9 @@
   --text-tertiary:  #3D4270;
 
   /* Brand */
-  --electric:       #2979FF;
-  --electric-light: #5C9DFF;
-  --electric-glow:  rgba(41, 121, 255, 0.20);
+  --electric:       #2F7DF6;
+  --electric-light: #75A7FF;
+  --electric-glow:  rgba(47, 125, 246, 0.18);
 
   /* Status */
   --online:         #00D68F;
@@ -50,19 +71,41 @@
 }
 
 .light {
-  --bg-base:        #F0F4FF;
+  color-scheme: light;
+  --background: 216 38% 97%;
+  --foreground: 224 45% 12%;
+  --card: 0 0% 100%;
+  --card-foreground: 224 45% 12%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 224 45% 12%;
+  --primary: 216 83% 52%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 218 32% 93%;
+  --secondary-foreground: 224 45% 16%;
+  --muted: 218 32% 94%;
+  --muted-foreground: 224 15% 45%;
+  --accent: 216 82% 95%;
+  --accent-foreground: 216 83% 34%;
+  --destructive: 350 76% 50%;
+  --destructive-foreground: 0 0% 100%;
+  --border-hsl: 220 22% 84%;
+  --input: 220 22% 84%;
+  --ring: 216 83% 52%;
+
+  --bg-base:        #F5F7FB;
   --bg-elevated:    #FFFFFF;
   --bg-card:        #FFFFFF;
-  --bg-card-hover:  #F5F8FF;
-  --bg-subtle:      #EEF2FF;
-  --border:         rgba(224, 231, 255, 0.9);
-  --border-hover:   rgba(41, 121, 255, 0.30);
-  --border-active:  rgba(41, 121, 255, 0.60);
-  --text:           #0A0E2A;
-  --text-secondary: #5C6394;
-  --text-tertiary:  #A0AAD4;
-  --electric:       #2979FF;
-  --electric-glow:  rgba(41, 121, 255, 0.12);
+  --bg-card-hover:  #F2F6FC;
+  --bg-subtle:      #E8EEF8;
+  --border:         rgba(190, 201, 222, 0.82);
+  --border-hover:   rgba(47, 125, 246, 0.30);
+  --border-active:  rgba(47, 125, 246, 0.58);
+  --text:           #111827;
+  --text-secondary: #596579;
+  --text-tertiary:  #8E99AD;
+  --electric:       #1F6FEB;
+  --electric-light: #4F8DF7;
+  --electric-glow:  rgba(31, 111, 235, 0.12);
   --online:         #00B87A;
   --online-glow:    rgba(0, 184, 122, 0.12);
   --offline:        #E5284F;
@@ -86,12 +129,35 @@ html {
 }
 
 body {
-  font-family: 'Inter', system-ui, sans-serif;
+  font-family: 'Inter', 'Segoe UI', system-ui, sans-serif;
   font-size: 14px;
   background-color: var(--bg-base);
   color: var(--text);
   transition: background-color var(--transition-slow), color var(--transition-slow);
   overflow-x: hidden;
+}
+
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 18% 8%, rgba(47,125,246,0.10), transparent 28%),
+    radial-gradient(circle at 82% 18%, rgba(0,214,143,0.055), transparent 24%),
+    linear-gradient(180deg, rgba(255,255,255,0.018), transparent 42%);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
 }
 
 /* ═══════════════════════════════════════════════════════════════
@@ -116,9 +182,9 @@ body {
   .glass-card {
     background: var(--bg-card);
     border: 1px solid var(--border);
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
-    box-shadow: 0 4px 24px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.04);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    box-shadow: 0 8px 28px rgba(0,0,0,0.28), inset 0 1px 0 rgba(255,255,255,0.035);
     transition:
       border-color var(--transition-base),
       box-shadow var(--transition-base),
@@ -127,10 +193,88 @@ body {
   .glass-card:hover {
     border-color: var(--border-hover);
     box-shadow:
-      0 8px 40px rgba(0,0,0,0.55),
-      0 0 0 1px rgba(41,121,255,0.10),
-      inset 0 1px 0 rgba(255,255,255,0.06);
-    transform: translateY(-2px);
+      0 10px 34px rgba(0,0,0,0.34),
+      0 0 0 1px rgba(47,125,246,0.08),
+      inset 0 1px 0 rgba(255,255,255,0.055);
+    transform: translateY(-1px);
+  }
+
+  .ministry-surface {
+    background:
+      linear-gradient(180deg, rgba(255,255,255,0.035), transparent 42%),
+      var(--bg-card);
+    border: 1px solid var(--border);
+    box-shadow: 0 10px 30px rgba(0,0,0,0.22), inset 0 1px 0 rgba(255,255,255,0.04);
+  }
+
+  .scada-page {
+    min-height: calc(100vh - 56px);
+    background:
+      linear-gradient(180deg, rgba(255,255,255,0.018), transparent 220px),
+      var(--bg-base);
+  }
+
+  .scada-panel {
+    background:
+      linear-gradient(180deg, rgba(255,255,255,0.035), transparent 46%),
+      var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    box-shadow: 0 12px 32px rgba(0,0,0,0.24), inset 0 1px 0 rgba(255,255,255,0.04);
+  }
+
+  .scada-panel-soft {
+    background: color-mix(in srgb, var(--bg-card) 82%, transparent);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+  }
+
+  .scada-toolbar {
+    background: color-mix(in srgb, var(--bg-elevated) 88%, transparent);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.035);
+  }
+
+  .metric-tile {
+    background:
+      linear-gradient(180deg, rgba(255,255,255,0.04), transparent 55%),
+      color-mix(in srgb, var(--bg-card) 92%, transparent);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.04);
+  }
+
+  .chart-frame {
+    background:
+      linear-gradient(180deg, rgba(47,125,246,0.045), transparent 34%),
+      var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    box-shadow: 0 12px 36px rgba(0,0,0,0.28);
+  }
+
+  .control-chip {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.035);
+  }
+
+  .control-chip-active {
+    color: white;
+    background: linear-gradient(180deg, var(--electric-light), var(--electric));
+    border-color: color-mix(in srgb, var(--electric) 75%, white 10%);
+    box-shadow: 0 0 18px rgba(47,125,246,0.28), inset 0 1px 0 rgba(255,255,255,0.18);
+  }
+
+  .ministry-focus {
+    outline: none;
+  }
+  .ministry-focus:focus-visible {
+    box-shadow:
+      0 0 0 2px hsl(var(--background)),
+      0 0 0 4px hsl(var(--ring) / 0.75);
   }
 
   /* Signal value flash */
@@ -184,7 +328,7 @@ body {
 
   /* Mono number display */
   .mono-value {
-    font-family: 'JetBrains Mono', monospace;
+    font-family: 'JetBrains Mono', 'Cascadia Mono', Consolas, monospace;
     font-variant-numeric: tabular-nums;
     letter-spacing: -0.02em;
   }

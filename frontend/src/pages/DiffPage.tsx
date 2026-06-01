@@ -664,9 +664,9 @@ export function DiffPage() {
         </div>
       ) : (
         <div ref={containerRef} className="flex-1 flex flex-col overflow-hidden p-4">
-          <div className="glass-card rounded-2xl overflow-hidden flex flex-col h-full">
+          <div className="chart-frame overflow-hidden flex flex-col h-full">
             {/* Toolbar */}
-            <div className="flex items-center justify-between gap-4 px-4 py-3 border-b border-[var(--border)] flex-wrap">
+            <div className="flex items-center justify-between gap-4 px-4 py-3 border-b border-[var(--border)] bg-[var(--bg-elevated)]/45 flex-wrap">
               <div className="flex items-center gap-3">
                 <div className="w-1 h-7 rounded-full bg-gradient-to-b from-[var(--electric)] to-[var(--electric-light)]" />
                 <div>
@@ -705,7 +705,7 @@ export function DiffPage() {
                     flex items-center gap-1.5 h-7 px-2.5 rounded-md text-[11px] font-medium
                     transition-all border
                     ${normalize
-                      ? 'bg-[var(--electric)] text-white border-[var(--electric)]'
+                      ? 'control-chip-active border-transparent'
                       : 'bg-[var(--bg-card)] text-ink-300 hover:text-[var(--text)] border-[var(--border)]'
                     }
                   `}
@@ -714,13 +714,13 @@ export function DiffPage() {
                   <Percent size={11} /> Norm
                 </button>
 
-                <div className="flex items-center gap-0.5 p-0.5 rounded-md bg-[var(--bg-card)] border border-[var(--border)]">
+                <div className="flex items-center gap-0.5 p-0.5 control-chip">
                   <button onClick={() => zoom(0.6)} className="w-6 h-6 rounded flex items-center justify-center text-ink-300 hover:text-[var(--text)] hover:bg-[var(--bg-subtle)] transition-colors"><ZoomIn size={12} /></button>
                   <button onClick={() => zoom(1.7)} className="w-6 h-6 rounded flex items-center justify-center text-ink-300 hover:text-[var(--text)] hover:bg-[var(--bg-subtle)] transition-colors"><ZoomOut size={12} /></button>
                   <button onClick={() => setPreset('1y')} className="w-6 h-6 rounded flex items-center justify-center text-ink-300 hover:text-[var(--text)] hover:bg-[var(--bg-subtle)] transition-colors"><RotateCcw size={11} /></button>
                 </div>
 
-                <div className="flex items-center gap-0.5 p-0.5 rounded-md bg-[var(--bg-card)] border border-[var(--border)]">
+                <div className="flex items-center gap-0.5 p-0.5 control-chip">
                   {RANGE_PRESETS.map(p => (
                     <button
                       key={p.value}
@@ -728,7 +728,7 @@ export function DiffPage() {
                       className={`
                         px-2 h-6 rounded text-[10px] font-medium transition-colors
                         ${activeRange === p.value
-                          ? 'bg-[var(--electric)] text-white shadow-[0_0_16px_rgba(41,121,255,0.35)] ring-1 ring-[var(--electric-light)]/40'
+                          ? 'control-chip-active'
                           : 'text-ink-300 hover:text-[var(--text)] hover:bg-[var(--bg-subtle)]'
                         }
                       `}
@@ -738,7 +738,7 @@ export function DiffPage() {
                   ))}
                 </div>
 
-                <div className="flex items-center gap-1.5 rounded-md bg-[var(--bg-card)] border border-[var(--border)] px-2 py-1">
+                <div className="flex items-center gap-1.5 control-chip px-2 py-1">
                   <label className="flex items-center gap-1 text-[10px] text-ink-300">
                     Dan
                     <input

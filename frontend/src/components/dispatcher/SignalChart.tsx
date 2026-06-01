@@ -216,13 +216,13 @@ export const SignalChart = memo(function SignalChart({
 
   return (
     <motion.div
-      className="glass-card rounded-2xl overflow-hidden"
+      className="chart-frame overflow-hidden"
       initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: index * 0.07, duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
     >
       {/* Chart header */}
-      <div className="flex items-center justify-between px-4 pt-3.5 pb-2 border-b border-[var(--border)]">
+      <div className="flex items-center justify-between px-4 pt-3.5 pb-2 border-b border-[var(--border)] bg-[var(--bg-elevated)]/40">
         <div className="flex items-center gap-2">
           <div
             className="w-1 h-5 rounded-full transition-colors"
@@ -263,7 +263,7 @@ export const SignalChart = memo(function SignalChart({
       </div>
 
       {/* Chart body */}
-      <div className="px-2 pt-2 pb-1">
+      <div className="px-2 pt-2 pb-1 bg-[var(--bg-base)]/20">
         {isLoading ? (
           <ChartSkeleton />
         ) : isError ? (

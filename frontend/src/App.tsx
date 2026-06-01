@@ -1,7 +1,7 @@
 import { Suspense, lazy, Component, type ReactNode } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { motion } from 'framer-motion'
+import { MotionConfig, motion } from 'framer-motion'
 import { useQuery } from '@tanstack/react-query'
 import { TopBar }  from '@/components/layout/TopBar'
 import { Sidebar } from '@/components/layout/Sidebar'
@@ -133,7 +133,7 @@ function AppLayout() {
   }
 
   return (
-    <div className="min-h-screen bg-[var(--bg-base)]">
+    <div className="min-h-screen bg-[var(--bg-base)] text-[var(--text)]">
       <TopBar
         branches={branches}
         substations={substations}
@@ -141,7 +141,7 @@ function AppLayout() {
       />
       <Sidebar substations={substations} devices={{}} />
 
-      <main className="pl-[240px] pt-14 h-screen overflow-hidden">
+      <main className="pl-[240px] pt-14 h-screen overflow-hidden scada-page">
         <ErrorBoundary>
           <Suspense fallback={<PageLoader />}>
             <Routes>
@@ -165,10 +165,12 @@ function AppLayout() {
 // ── Root ─────────────────────────────────────────
 export default function App() {
   return (
-    <QueryClientProvider client={queryClient}>
-      <BrowserRouter>
-        <AppLayout />
-      </BrowserRouter>
-    </QueryClientProvider>
+    <MotionConfig reducedMotion="user" transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}>
+      <QueryClientProvider client={queryClient}>
+        <BrowserRouter>
+          <AppLayout />
+        </BrowserRouter>
+      </QueryClientProvider>
+    </MotionConfig>
   )
 }

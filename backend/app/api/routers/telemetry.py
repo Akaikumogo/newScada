@@ -8,6 +8,7 @@ Telemetry router:
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
+from math import ceil
 
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy import select, text
@@ -16,12 +17,17 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.dependencies import get_db
 from app.api.schemas import DeviceLiveData, LiveSignalValue, RangePoint, RecordOut
 from app.infrastructure.cache.redis_cache import (
-    get_all_device_signals,
     get_all_device_statuses,
+    get_many_signal_values,
 )
 from app.infrastructure.db.models import Device, DeviceSignal, Record
 
 router = APIRouter(prefix="/telemetry", tags=["telemetry"])
+
+
+def _activity_bucket_sec(from_ts: datetime, to_ts: datetime) -> int:
+    duration_sec = max(60, int((to_ts - from_ts).total_seconds()))
+    return max(60, min(3600, int(ceil(duration_sec / 240))))
 
 
 # ──────────────────────────────────────────────
@@ -47,9 +53,16 @@ async def get_live(
     device_ids = [d.id for d in devices]
     statuses = await get_all_device_statuses(device_ids)
 
-    # Get all signals for these devices
-    sig_q = select(DeviceSignal).where(DeviceSignal.device_id.in_(device_ids))
+    # Get only live-visible signals and read exact Redis keys in one MGET.
+    sig_q = select(DeviceSignal).where(
+        DeviceSignal.device_id.in_(device_ids),
+        (DeviceSignal.active.is_(True)) | (DeviceSignal.only_realtime.is_(True)),
+    )
     all_signals = (await db.execute(sig_q)).scalars().all()
+    cached_values = await get_many_signal_values([
+        (signal.device_id, signal.signal_name)
+        for signal in all_signals
+    ])
     # group by device_id
     sig_map: dict[int, list[DeviceSignal]] = {}
     for s in all_signals:
@@ -57,11 +70,10 @@ async def get_live(
 
     result: list[DeviceLiveData] = []
     for device in devices:
-        cached = await get_all_device_signals(device.id)
         status = statuses.get(device.id, {})
         sigs: list[LiveSignalValue] = []
         for sig in sig_map.get(device.id, []):
-            entry = cached.get(sig.signal_name)
+            entry = cached_values.get((device.id, sig.signal_name))
             sigs.append(LiveSignalValue(
                 signal_name=sig.signal_name,
                 value=entry["value"] if entry else None,
@@ -477,3 +489,151 @@ async def get_diff(
             count=int(row.count),
         ))
     return grouped
+
+
+@router.get("/device-activity", response_model=dict)
+async def get_device_activity(
+    from_ts:       datetime      = Query(...),
+    to_ts:         datetime      = Query(...),
+    substation_id: int | None    = Query(None),
+    device_id:     int | None    = Query(None),
+    bucket_sec:    int | None    = Query(None, ge=60, le=86400),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Device activity timeline based on persisted record rows.
+
+    A bucket is active when at least one record exists for that device inside
+    the bucket. Inactive bucket ranges are returned as outages.
+    """
+    bucket = bucket_sec or _activity_bucket_sec(from_ts, to_ts)
+    duration_sec = max(1, int((to_ts - from_ts).total_seconds()))
+    # Clamp bucket count to max 480 to keep payloads sane
+    if duration_sec / bucket > 480:
+        bucket = max(60, int(ceil(duration_sec / 480)))
+
+    empty = {"from_ts": from_ts, "to_ts": to_ts, "bucket_sec": bucket, "devices": []}
+    if to_ts <= from_ts:
+        return empty
+
+    devices_q = select(Device)
+    if substation_id is not None:
+        devices_q = devices_q.where(Device.substation_id == substation_id)
+    if device_id is not None:
+        devices_q = devices_q.where(Device.id == device_id)
+    devices = (await db.execute(devices_q.order_by(Device.id))).scalars().all()
+    if not devices:
+        return empty
+
+    device_ids = [d.id for d in devices]
+    bucket_count = max(1, int(ceil(duration_sec / bucket)))
+    from_epoch = from_ts.timestamp()
+
+    # Single query: bucket-level aggregates + per-device totals via SQL
+    sql = text("""
+        SELECT
+            device_id,
+            floor((EXTRACT(EPOCH FROM captured_at) - :from_epoch) / :bucket_sec)::int AS bidx,
+            COUNT(*)::int AS cnt
+        FROM record
+        WHERE device_id = ANY(:device_ids)
+          AND captured_at >= :from_ts
+          AND captured_at <  :to_ts
+        GROUP BY device_id, bidx
+        ORDER BY device_id, bidx
+    """)
+    rows = (await db.execute(sql, {
+        "device_ids": device_ids,
+        "from_ts": from_ts,
+        "to_ts": to_ts,
+        "bucket_sec": bucket,
+        "from_epoch": from_epoch,
+    })).fetchall()
+
+    # Device-level first/last seen in one aggregate query
+    agg_sql = text("""
+        SELECT device_id, MIN(captured_at) AS first_seen, MAX(captured_at) AS last_seen
+        FROM record
+        WHERE device_id = ANY(:device_ids)
+          AND captured_at >= :from_ts AND captured_at < :to_ts
+        GROUP BY device_id
+    """)
+    agg_rows = (await db.execute(agg_sql, {
+        "device_ids": device_ids,
+        "from_ts": from_ts,
+        "to_ts": to_ts,
+    })).fetchall()
+    agg_map = {r.device_id: (r.first_seen, r.last_seen) for r in agg_rows}
+
+    # Build sparse bucket maps: device_id -> {bidx: count}
+    by_device: dict[int, dict[int, int]] = {did: {} for did in device_ids}
+    for row in rows:
+        bidx = row.bidx
+        if 0 <= bidx < bucket_count:
+            by_device[row.device_id][bidx] = row.cnt
+
+    result_devices: list[dict] = []
+    for device in devices:
+        bmap = by_device.get(device.id, {})
+        active_count = len(bmap)
+        total_records = sum(bmap.values())
+        first_seen, last_seen = agg_map.get(device.id, (None, None))
+
+        # Build timeline + outages in a single pass using integer arithmetic
+        timeline: list[dict] = []
+        outages: list[dict] = []
+        outage_start: int | None = None
+
+        for idx in range(bucket_count):
+            cnt = bmap.get(idx, 0)
+            active = cnt > 0
+            if active and outage_start is not None:
+                s = from_epoch + outage_start * bucket
+                e = from_epoch + idx * bucket
+                outages.append({
+                    "from_ts": datetime.fromtimestamp(s, tz=timezone.utc),
+                    "to_ts": datetime.fromtimestamp(e, tz=timezone.utc),
+                    "duration_sec": int(e - s),
+                })
+                outage_start = None
+            elif not active and outage_start is None:
+                outage_start = idx
+
+            timeline.append({
+                "ts": datetime.fromtimestamp(from_epoch + idx * bucket, tz=timezone.utc),
+                "active": active,
+                "record_count": cnt,
+            })
+
+        if outage_start is not None:
+            s = from_epoch + outage_start * bucket
+            e = min(to_ts.timestamp(), from_epoch + bucket_count * bucket)
+            outages.append({
+                "from_ts": datetime.fromtimestamp(s, tz=timezone.utc),
+                "to_ts": datetime.fromtimestamp(e, tz=timezone.utc),
+                "duration_sec": int(e - s),
+            })
+
+        uptime_percent = round((active_count / bucket_count) * 100, 2)
+        result_devices.append({
+            "device_id": device.id,
+            "name": device.name,
+            "host": device.iec104_host,
+            "port": device.iec104_port,
+            "bucket_count": bucket_count,
+            "active_buckets": active_count,
+            "uptime_percent": uptime_percent,
+            "downtime_percent": round(100 - uptime_percent, 2),
+            "total_records": total_records,
+            "first_seen": first_seen,
+            "last_seen": last_seen,
+            "outages": outages,
+            "timeline": timeline,
+        })
+
+    return {
+        "from_ts": from_ts,
+        "to_ts": to_ts,
+        "bucket_sec": bucket,
+        "devices": result_devices,
+    }

@@ -4,9 +4,10 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { useQuery } from '@tanstack/react-query'
 import {
   ArrowLeft, Network, LayoutGrid, BarChart2, Table2,
-  ChevronDown, Wifi, WifiOff, Search, GitCompare,
+  ChevronDown, Wifi, WifiOff, Search, GitCompare, Activity,
 } from 'lucide-react'
 import { DeviceCard, DeviceCardSkeleton } from '@/components/dispatcher/DeviceCard'
+import { DeviceActivity } from '@/components/dispatcher/DeviceActivity'
 import { SignalChart, type TimeRange } from '@/components/dispatcher/SignalChart'
 import { HistoryTable } from '@/components/dispatcher/HistoryTable'
 import { StatusBadge } from '@/components/dispatcher/StatusBadge'
@@ -16,10 +17,11 @@ import { useDispatcherStore } from '@/store/dispatcher'
 import type { Device } from '@/types'
 
 // ── Tabs ─────────────────────────────────────────
-type Tab = 'monitoring' | 'charts' | 'table'
+type Tab = 'monitoring' | 'activity' | 'charts' | 'table'
 
 const TABS: { value: Tab; icon: React.ElementType; label: string }[] = [
   { value: 'monitoring', icon: LayoutGrid, label: 'Monitoring' },
+  { value: 'activity',   icon: Activity,   label: 'Activity' },
   { value: 'charts',     icon: BarChart2,  label: 'Grafiklar' },
   { value: 'table',      icon: Table2,     label: 'Jadval' },
 ]
@@ -277,23 +279,23 @@ export function SubstationPage() {
                 {substation?.name ?? 'Podstansiya'}
               </h1>
 
-              <div className="flex items-center gap-3 mt-0.5">
+              <div className="flex items-center gap-3 mt-1">
                 {!isLoading && (
                   <>
-                    <div className="flex items-center gap-1.5">
+                    <div className="metric-tile flex items-center gap-1.5 px-2.5 py-1">
                       <Wifi size={11} className="text-[#00D68F]" />
                       <span className="text-[12px] font-mono text-[#00D68F] font-semibold">{onlineCount}</span>
                       <span className="text-[12px] text-ink-300">online</span>
                     </div>
                     {offlineCount > 0 && (
-                      <div className="flex items-center gap-1.5">
+                      <div className="metric-tile flex items-center gap-1.5 px-2.5 py-1">
                         <WifiOff size={11} className="text-[#FF3D71]" />
                         <span className="text-[12px] font-mono text-[#FF3D71] font-semibold">{offlineCount}</span>
                         <span className="text-[12px] text-ink-300">offline</span>
                       </div>
                     )}
                     <span className="text-ink-300/40 text-[12px]">·</span>
-                    <span className="text-[12px] text-ink-300">{devices.length} ta qurilma</span>
+                    <span className="metric-tile px-2.5 py-1 text-[12px] text-ink-300">{devices.length} ta qurilma</span>
                   </>
                 )}
               </div>
@@ -419,6 +421,18 @@ export function SubstationPage() {
           )}
 
           {/* ── CHARTS TAB ──────────────────────── */}
+          {tab === 'activity' && (
+            <motion.div
+              key="activity"
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -4 }}
+              transition={{ duration: 0.2 }}
+            >
+              <DeviceActivity substationId={substationId} />
+            </motion.div>
+          )}
+
           {tab === 'charts' && (
             <motion.div
               key="charts"
@@ -444,7 +458,7 @@ export function SubstationPage() {
               </div>
 
               {chartDevice && (
-                <div className="flex items-center gap-3 p-3 rounded-xl bg-[var(--bg-card)] border border-[var(--border)]">
+                <div className="scada-toolbar flex items-center gap-3 p-3">
                   <StatusBadge status={statuses[chartDevice.id]?.status ?? 'unknown'} size="sm" />
                   <code className="text-[11px] font-mono text-ink-300">
                     {chartDevice.iec104_host}:{chartDevice.iec104_port} · CASDU {chartDevice.iec104_common_address}
@@ -518,7 +532,7 @@ export function SubstationPage() {
               </div>
 
               {chartDevice && (
-                <div className="flex items-center gap-3 p-3 rounded-xl bg-[var(--bg-card)] border border-[var(--border)]">
+                <div className="scada-toolbar flex items-center gap-3 p-3">
                   <StatusBadge status={statuses[chartDevice.id]?.status ?? 'unknown'} size="sm" />
                   <code className="text-[11px] font-mono text-ink-300">
                     {chartDevice.iec104_host}:{chartDevice.iec104_port} · CASDU {chartDevice.iec104_common_address}
