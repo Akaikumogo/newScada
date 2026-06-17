@@ -29,6 +29,8 @@ from app.api.routers import (
     yunusobod,
     logs,
     ws,
+    auth,
+    backup,
 )
 
 logging.basicConfig(
@@ -132,6 +134,8 @@ app.include_router(signals.router,      prefix=API_PREFIX)
 app.include_router(telemetry.router,    prefix=API_PREFIX)
 app.include_router(yunusobod.router,    prefix=API_PREFIX)
 app.include_router(logs.router,         prefix=API_PREFIX)
+app.include_router(auth.router,         prefix=API_PREFIX)
+app.include_router(backup.router,       prefix=API_PREFIX)
 app.include_router(ws.router)           # no prefix — mounts at /ws
 
 

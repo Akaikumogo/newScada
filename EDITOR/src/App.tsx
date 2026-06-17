@@ -1,9 +1,10 @@
-import { Suspense, lazy } from 'react'
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { Suspense, lazy, type ReactNode } from 'react'
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { AnimatePresence, motion } from 'framer-motion'
 import { Toaster } from 'sonner'
 import { TopBar } from '@/components/layout/TopBar'
+import { auth } from '@/lib/api'
 
 // Lazy pages
 const BranchesPage    = lazy(() => import('@/pages/BranchesPage').then(m => ({ default: m.BranchesPage })))
@@ -14,6 +15,16 @@ const ModelsPage      = lazy(() => import('@/pages/ModelsPage').then(m => ({ def
 const SchemaEditorPage  = lazy(() => import('@/pages/SchemaEditorPage').then(m => ({ default: m.SchemaEditorPage })))
 const ModelSignalsPage  = lazy(() => import('@/pages/ModelSignalsPage').then(m => ({ default: m.ModelSignalsPage })))
 const LogPage           = lazy(() => import('@/pages/LogPage').then(m => ({ default: m.LogPage })))
+const BackupPage        = lazy(() => import('@/pages/BackupPage').then(m => ({ default: m.BackupPage })))
+const LoginPage         = lazy(() => import('@/pages/LoginPage').then(m => ({ default: m.LoginPage })))
+
+function RequireAuth({ children }: { children: ReactNode }) {
+  const location = useLocation()
+  if (!auth.isAuthed()) {
+    return <Navigate to="/login" state={{ from: location.pathname }} replace />
+  }
+  return <>{children}</>
+}
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -51,6 +62,7 @@ function AppLayout() {
               <Route path="/models/:id/signals"            element={<ModelSignalsPage />} />
               <Route path="/substations/:id/schema"        element={<SchemaEditorPage />} />
               <Route path="/log"                           element={<LogPage />} />
+              <Route path="/backup"                        element={<BackupPage />} />
               <Route path="*"                              element={<Navigate to="/devices" replace />} />
             </Routes>
           </Suspense>
@@ -77,7 +89,19 @@ export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
-        <AppLayout />
+        <Suspense fallback={<PageLoader />}>
+          <Routes>
+            <Route path="/login" element={<LoginPage />} />
+            <Route
+              path="/*"
+              element={
+                <RequireAuth>
+                  <AppLayout />
+                </RequireAuth>
+              }
+            />
+          </Routes>
+        </Suspense>
       </BrowserRouter>
     </QueryClientProvider>
   )

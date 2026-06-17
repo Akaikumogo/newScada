@@ -1,7 +1,8 @@
 import { motion, AnimatePresence } from 'framer-motion'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { Zap, Moon, Sun, GitBranch, Building2, Server, Layers, Network, Activity } from 'lucide-react'
+import { Zap, Moon, Sun, GitBranch, Building2, Server, Layers, Network, Activity, Database, LogOut } from 'lucide-react'
 import { useTheme } from '@/hooks/useTheme'
+import { auth } from '@/lib/api'
 import { clsx } from 'clsx'
 
 const NAV_ITEMS = [
@@ -10,6 +11,7 @@ const NAV_ITEMS = [
   { path: '/devices',     label: 'Qurilmalar',    icon: Server     },
   { path: '/models',      label: 'Modellar',      icon: Layers     },
   { path: '/log',         label: 'Log',           icon: Activity   },
+  { path: '/backup',      label: 'Backup',        icon: Database   },
 ]
 
 export function TopBar() {
@@ -19,6 +21,11 @@ export function TopBar() {
 
   function isActive(path: string) {
     return location.pathname.startsWith(path)
+  }
+
+  function logout() {
+    auth.clear()
+    navigate('/login', { replace: true })
   }
 
   return (
@@ -48,7 +55,7 @@ export function TopBar() {
       </div>
 
       {/* Navigation tabs */}
-      <nav className="flex items-center gap-1 flex-1 max-w-lg">
+      <nav className="flex items-center gap-1 flex-1 max-w-2xl">
         {NAV_ITEMS.map(item => {
           const Icon   = item.icon
           const active = isActive(item.path)
@@ -94,6 +101,17 @@ export function TopBar() {
           <Network size={12} />
           Dispatcher
         </motion.a>
+
+        {/* Logout */}
+        <motion.button
+          onClick={logout}
+          title="Chiqish"
+          className="w-8 h-8 rounded-lg flex items-center justify-center text-[var(--text-secondary)] hover:text-[var(--text)] hover:bg-[var(--bg-hover)] border border-[var(--border)] transition-all"
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
+        >
+          <LogOut size={13} />
+        </motion.button>
 
         {/* Theme toggle */}
         <motion.button

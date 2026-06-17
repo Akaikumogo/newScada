@@ -1,11 +1,77 @@
 import axios from 'axios'
 import type { Branch, Substation, Device, Signal, DeviceModel, ModelSignal, ApplyResult, RegisterLog } from '@/types'
 
+// ── Auth token storage ────────────────────────────
+const TOKEN_KEY = 'newscada_editor_token'
+export const auth = {
+  getToken: () => localStorage.getItem(TOKEN_KEY),
+  setToken: (t: string) => localStorage.setItem(TOKEN_KEY, t),
+  clear: () => localStorage.removeItem(TOKEN_KEY),
+  isAuthed: () => !!localStorage.getItem(TOKEN_KEY),
+}
+
 // ── Axios instance ────────────────────────────────
 const api = axios.create({
   baseURL: '/api',
   timeout: 15_000,
 })
+
+// Attach token to every request
+api.interceptors.request.use(cfg => {
+  const t = auth.getToken()
+  if (t) cfg.headers.Authorization = `Bearer ${t}`
+  return cfg
+})
+
+// Kick to /login on 401
+api.interceptors.response.use(
+  r => r,
+  err => {
+    if (err?.response?.status === 401) {
+      auth.clear()
+      if (!location.pathname.startsWith('/login')) {
+        location.href = '/login'
+      }
+    }
+    return Promise.reject(err)
+  },
+)
+
+// ── Auth API ──────────────────────────────────────
+export const authApi = {
+  login: (username: string, password: string) =>
+    api.post<{ token: string; username: string }>('/auth/login', { username, password }).then(r => r.data),
+  me: () => api.get<{ username: string }>('/auth/me').then(r => r.data),
+}
+
+// ── Backup API ────────────────────────────────────
+export const backupApi = {
+  download: async () => {
+    const res = await api.get('/backup/download', { responseType: 'blob', timeout: 120_000 })
+    const cd = res.headers['content-disposition'] || ''
+    const m = /filename="?([^";]+)"?/.exec(cd)
+    const filename = m ? m[1] : `newscada_${new Date().toISOString().replace(/[:.]/g, '-')}.dump`
+    const url = URL.createObjectURL(res.data as Blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = filename
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+    URL.revokeObjectURL(url)
+    return filename
+  },
+  upload: async (file: File) => {
+    const form = new FormData()
+    form.append('file', file)
+    const res = await api.post<{ ok: boolean; restored_bytes: number; filename: string }>(
+      '/backup/upload',
+      form,
+      { headers: { 'Content-Type': 'multipart/form-data' }, timeout: 300_000 },
+    )
+    return res.data
+  },
+}
 
 // ── Paginated response ────────────────────────────
 export interface Paginated<T> {
