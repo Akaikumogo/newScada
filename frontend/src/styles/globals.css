@@ -344,6 +344,181 @@ body::before {
 }
 
 /* ═══════════════════════════════════════════════════════════════
+   Schema canvas — Yunusobod SCADA dark palette (ref-aligned)
+   (force dark token values even when .light is active on <html>)
+═══════════════════════════════════════════════════════════════ */
+.schema-dark-canvas {
+  color-scheme: dark;
+  /* Surfaces — deep navy */
+  --bg-base:        #030712;
+  --bg-elevated:    #071428;
+  --bg-card:        #0A1730;
+  --bg-card-hover:  #102043;
+  --bg-subtle:      #14264E;
+  --bg-page:        #030712;
+  /* Borders — bluish */
+  --border:         rgba(59, 130, 246, 0.18);
+  --border-hover:   rgba(59, 130, 246, 0.36);
+  --border-active:  rgba(59, 130, 246, 0.60);
+  /* Text */
+  --text:           #DBEAFE;
+  --text-secondary: #94A3B8;
+  --text-tertiary:  #475569;
+  /* Brand */
+  --electric:       #3B82F6;
+  --brand:          #3B82F6;
+  /* Voltage rail colors */
+  --kv-110:         #FF4D7A;
+  --kv-35:          #F5A623;
+  --kv-10:          #2DD4BF;
+  --kv-04:          #94A3B8;
+  /* Status */
+  --status-success: #10B981;
+  --status-danger:  #EF4444;
+  --status-warning: #F59E0B;
+  background-color: #020617;
+}
+.schema-dark-canvas .react-flow__controls {
+  background: #0D1324;
+  border: 1px solid rgba(64, 76, 114, 0.56);
+  border-radius: 8px;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.4);
+  overflow: hidden;
+}
+.schema-dark-canvas .react-flow__controls-button {
+  background: #0D1324;
+  color: #E8EBF8;
+  border-bottom: 1px solid rgba(64, 76, 114, 0.4);
+  fill: #E8EBF8;
+}
+.schema-dark-canvas .react-flow__controls-button:hover {
+  background: #151C30;
+}
+.schema-dark-canvas .react-flow__attribution {
+  background: transparent;
+  color: #3D4270;
+}
+
+/* Read-only view: hide all connection handles (white dots) */
+.schema-dark-canvas .react-flow__handle {
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
+/* Override React Flow default white node background */
+.schema-dark-canvas .react-flow__node {
+  background: transparent !important;
+  background-color: transparent !important;
+  background-image: none !important;
+  border: none !important;
+  border-radius: 0 !important;
+  padding: 0 !important;
+  box-shadow: none !important;
+  color: var(--text) !important;
+  width: auto !important;
+}
+.schema-dark-canvas .react-flow__node-default,
+.schema-dark-canvas .react-flow__node-input,
+.schema-dark-canvas .react-flow__node-output {
+  background: transparent !important;
+  background-color: transparent !important;
+  border: none !important;
+}
+/* Selected state — keep subtle highlight without filling box */
+.schema-dark-canvas .react-flow__node.selected {
+  background: transparent !important;
+}
+
+/* MiniMap — make it visible on dark canvas */
+.schema-dark-canvas .react-flow__minimap {
+  background: #0A1730 !important;
+  border: 1px solid rgba(59, 130, 246, 0.30) !important;
+  border-radius: 8px !important;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
+  bottom: 16px !important;
+  right: 16px !important;
+}
+.schema-dark-canvas .react-flow__minimap-mask {
+  fill: rgba(3, 7, 18, 0.6);
+}
+
+/* Edges should be crisp on dark canvas */
+.schema-dark-canvas .react-flow__edge-path {
+  stroke: #9BB0D3;
+  stroke-width: 1.5;
+}
+
+/* Tailwind ink-300 -> better contrast on dark */
+.schema-dark-canvas .text-ink-300 {
+  color: #9BB0D3;
+}
+.schema-dark-canvas .text-ink-200 {
+  color: #C4CEE5;
+}
+
+/* Slight glow under nodes so they pop from the grid */
+.schema-dark-canvas .react-flow__node {
+  filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.5));
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   SCADA Dashboard panels (right rail next to canvas)
+═══════════════════════════════════════════════════════════════ */
+.scada-dash {
+  background:
+    linear-gradient(180deg, rgba(59,130,246,0.04), transparent 30%),
+    #030712;
+  border-left: 1px solid rgba(59, 130, 246, 0.14);
+}
+.scada-card {
+  background:
+    linear-gradient(180deg, rgba(59,130,246,0.05), transparent 50%),
+    #071428;
+  border: 1px solid rgba(59, 130, 246, 0.18);
+  border-radius: 10px;
+  box-shadow:
+    0 0 0 1px rgba(59,130,246,0.04) inset,
+    0 8px 24px rgba(0,0,0,0.35);
+}
+.scada-card__title {
+  font-family: 'Inter', 'DIN', system-ui, sans-serif;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #94A3B8;
+}
+.scada-mono {
+  font-family: 'JetBrains Mono', 'Roboto Mono', 'Cascadia Mono', monospace;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+.scada-rail-badge {
+  font-family: 'JetBrains Mono', 'Roboto Mono', monospace;
+  font-weight: 800;
+  font-size: 13px;
+  letter-spacing: 0.04em;
+  padding: 6px 14px;
+  border-radius: 6px;
+  background: rgba(7, 20, 40, 0.92);
+  border: 1px solid rgba(59,130,246,0.22);
+  box-shadow: 0 6px 18px rgba(0,0,0,0.45);
+  backdrop-filter: blur(6px);
+}
+.scada-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 999px;
+  border: 1px solid rgba(59,130,246,0.18);
+  background: rgba(7, 20, 40, 0.6);
+}
+
+/* ═══════════════════════════════════════════════════════════════
    Selection color
 ═══════════════════════════════════════════════════════════════ */
 ::selection {

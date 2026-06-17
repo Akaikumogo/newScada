@@ -12,7 +12,7 @@ export default defineConfig({
   build: {
     // ── Chunk splitting — separate heavy libs for better caching ──
     rollupOptions: {
-      output: {
+      output: { 
         manualChunks: {
           'vendor-react':  ['react', 'react-dom', 'react-router-dom'],
           'vendor-query':  ['@tanstack/react-query'],
@@ -28,13 +28,13 @@ export default defineConfig({
   },
   server: {
     port: 3000,
-    host: '127.0.0.1',  // bind IPv4 so proxy + browser are on the same stack
+    host: '10.10.0.77',  // bind IPv4 so proxy + browser are on the same stack
     proxy: {
       // Node 17+ resolves "localhost" to IPv6 ::1 first — but the
-      // FastAPI backend listens on IPv4 127.0.0.1 only.  Using the
+      // FastAPI backend listens on IPv4 10.10.0.77 only.  Using the
       // numeric address avoids the DNS hop and the IPv4/IPv6 mismatch.
-      '/api': { target: 'http://127.0.0.1:8000', changeOrigin: true },
-      '/ws':  { target: 'ws://127.0.0.1:8000',  ws: true },
+      '/api': { target: 'http://10.10.0.77:8000', changeOrigin: true },
+      '/ws':  { target: 'ws://10.10.0.77:8000',  ws: true },
     },
   },
 })

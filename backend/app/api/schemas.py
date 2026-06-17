@@ -142,7 +142,7 @@ class DeviceCreate(BaseModel):
     iec104_host: str = Field("127.0.0.1", max_length=64)
     iec104_port: int = Field(2404, ge=1, le=65535)
     iec104_common_address: int = Field(1, ge=1, le=65535)
-    poll_interval_seconds: float = Field(1.0, ge=0.5)
+    active: bool = True
 
 
 class DeviceUpdate(BaseModel):
@@ -152,7 +152,7 @@ class DeviceUpdate(BaseModel):
     iec104_host: str | None = Field(None, max_length=64)
     iec104_port: int | None = Field(None, ge=1, le=65535)
     iec104_common_address: int | None = Field(None, ge=1, le=65535)
-    poll_interval_seconds: float | None = Field(None, ge=0.5)
+    active: bool | None = None
 
 
 class DeviceOut(BaseModel):
@@ -166,7 +166,7 @@ class DeviceOut(BaseModel):
     iec104_host: str
     iec104_port: int
     iec104_common_address: int
-    poll_interval_seconds: float
+    active: bool
     created_at: datetime
 
 

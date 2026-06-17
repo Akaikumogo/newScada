@@ -1,7 +1,7 @@
 import { memo, useMemo } from 'react'
 import { motion } from 'framer-motion'
 import { useNavigate, useParams } from 'react-router-dom'
-import { WifiOff, Clock, Server, Wifi, ArrowUpRight } from 'lucide-react'
+import { WifiOff, Clock, Wifi, ArrowUpRight, Network } from 'lucide-react'
 import { formatDistanceToNow } from 'date-fns'
 import { StatusBadge } from './StatusBadge'
 import { SignalRow } from './SignalRow'
@@ -113,12 +113,12 @@ export const DeviceCard = memo(function DeviceCard({ device, index }: Props) {
         className={`
           relative px-4 pt-4 pb-3
           bg-gradient-to-b ${getStatusGradient(status)}
-          border-b border-[var(--border)]
+          border-b border-[var(--border)] 
         `}
       >
         {/* Background glow */}
         <div
-          className="absolute top-0 right-0 w-32 h-32 opacity-20 pointer-events-none"
+          className="absolute top-0 right-[20px] w-10 h-10 - pointer-events-none"
           style={{
             background: status === 'online'
               ? 'radial-gradient(circle, #00D68F 0%, transparent 70%)'
@@ -138,11 +138,9 @@ export const DeviceCard = memo(function DeviceCard({ device, index }: Props) {
                 className="text-[var(--electric)] opacity-0 -translate-x-1 group-hover/card:opacity-100 group-hover/card:translate-x-0 transition-all duration-200"
               />
             </h3>
-            <div className="flex items-center gap-1.5 mt-1">
-              <Server size={10} className="text-ink-300 flex-shrink-0" />
-              <code className="text-[11px] font-mono text-ink-300">
-                {device.iec104_host}:{device.iec104_port}
-              </code>
+            <div className="flex items-center gap-1.5 mt-1 text-[11px] text-ink-300">
+              <Network size={10} className="text-ink-300 flex-shrink-0" />
+              <span className="font-mono">CASDU {device.iec104_common_address}</span>
             </div>
           </div>
           <StatusBadge status={status} size="sm" />
@@ -202,13 +200,9 @@ export const DeviceCard = memo(function DeviceCard({ device, index }: Props) {
         </div>
 
         <div className="flex items-center gap-1">
-          <span className="text-[11px] text-ink-300 font-mono">
-            CASDU {device.iec104_common_address}
-          </span>
+          <span className="text-[11px] text-ink-300 font-mono">{device.protocol}</span>
           <span className="text-ink-300/30 text-[11px]">·</span>
-          <span className="text-[11px] text-ink-300 font-mono">
-            {device.poll_interval_seconds}s
-          </span>
+          <span className="text-[11px] text-ink-300 font-mono">CASDU {device.iec104_common_address}</span>
         </div>
       </div>
     </motion.div>

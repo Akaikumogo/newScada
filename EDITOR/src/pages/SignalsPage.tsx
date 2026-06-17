@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo, useEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useInfiniteQuery, useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
@@ -6,7 +6,7 @@ import { useForm, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { clsx } from 'clsx'
-import { Plus, ArrowLeft, Trash2, Zap } from 'lucide-react'
+import { Plus, ArrowLeft, Trash2, Zap, FileSpreadsheet } from 'lucide-react'
 import { toast } from 'sonner'
 import { DataTable, type Column } from '@/components/ui/DataTable'
 import { Modal, ConfirmDialog } from '@/components/ui/Modal'
@@ -73,6 +73,20 @@ export function SignalsPage() {
     queryFn: () => deviceApi.getById(deviceId),
     enabled: !!deviceId,
   })
+
+  const { data: devicesPage } = useQuery({
+    queryKey: ['devices-selector'],
+    queryFn: () => deviceApi.listAll(0, 0),
+    staleTime: 60_000,
+  })
+
+  const devices = devicesPage?.items ?? []
+  const activeDevice = devices.find(d => d.id === deviceId) ?? device
+  const activeSignals = activeDevice?.signals?.filter(s => s.active || s.only_realtime).length ?? 0
+  const deviceOptions = (devices.length ? devices : activeDevice ? [activeDevice] : []).map(d => ({
+    value: d.id,
+    label: `${d.name} - CASDU ${d.iec104_common_address}`,
+  }))
 
   const { data, isLoading, hasNextPage, fetchNextPage, isFetchingNextPage } = useInfiniteQuery({
     queryKey: ['signals', deviceId],
@@ -170,6 +184,26 @@ export function SignalsPage() {
     },
     onError: (e: Error) => toast.error(e.message),
   })
+
+  /* ── Excel import ──────────────────────────────────────────────── */
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const importExcel = useMutation({
+    mutationFn: (file: File) => deviceApi.importExcel(deviceId, file),
+    onSuccess: (result) => {
+      queryClient.invalidateQueries({ queryKey: ['signals', deviceId] })
+      toast.success(
+        `${result.applied} ta signal qo'shildi, ${result.skipped} ta mavjud edi (faylda ${result.total_in_file} ta)`,
+        { duration: 6000 },
+      )
+    },
+    onError: (e: Error) => toast.error(`Import xato: ${e.message}`),
+  })
+
+  function handleFileSelected(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (file) importExcel.mutate(file)
+    e.target.value = ''
+  }
 
   /* ── Table columns (inside component → access toggle mutation) ─ */
   const columns: Column<Signal>[] = useMemo(() => [
@@ -349,41 +383,85 @@ export function SignalsPage() {
   return (
     <div className="p-6 flex flex-col gap-6">
       <motion.div
-        className="flex items-center justify-between"
+        className="flex items-center justify-between gap-4"
         initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }}
       >
-        <div className="flex items-center gap-3">
+        {/* Left: back + title */}
+        <div className="flex items-center gap-3 min-w-0">
           <Button variant="ghost" size="sm" icon={<ArrowLeft size={13} />} onClick={() => navigate('/devices')} />
-          <div>
-            <h1 className="text-[20px] font-semibold text-[var(--text)]">
-              {device?.name ?? 'Qurilma'} — Signallar
+          <div className="min-w-0">
+            <h1 className="text-[18px] font-semibold text-[var(--text)] leading-tight">
+              {device?.name ?? 'Qurilma'}
+              <span className="text-[var(--text-secondary)] font-normal"> — Signallar</span>
             </h1>
             {device && (
-              <code className="text-[11px] mono text-[var(--text-secondary)]">
-                {device.iec104_host}:{device.iec104_port} · CASDU {device.iec104_common_address} · {total} ta signal
+              <div className="flex items-center gap-2 mt-0.5">
+                <code className="text-[11px] mono text-[var(--text-secondary)]">
+                  CASDU {device.iec104_common_address}
               </code>
+                <span className="text-[10px] px-1.5 py-0.5 rounded bg-[var(--bg-hover)] text-[var(--text-secondary)] mono">
+                  {total} ta signal
+                </span>
+                {activeSignals > 0 && (
+                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-[var(--success-bg)] text-[var(--success)] border border-[var(--success)]/20 mono">
+                    {activeSignals} active/RT
+                  </span>
+                )}
+              </div>
             )}
           </div>
         </div>
-        <div className="flex items-center gap-2">
+
+        {/* Right: device selector + actions */}
+        <div className="flex items-center gap-2 shrink-0">
+          {/* Device switcher */}
+          <select
+            value={deviceId || ''}
+            onChange={e => {
+              const nextId = Number(e.target.value)
+              if (nextId && nextId !== deviceId) navigate(`/devices/${nextId}/signals`)
+            }}
+            className="h-8 px-2 pr-7 text-[12px] rounded-lg border border-[var(--border)] bg-[var(--bg-card)] text-[var(--text)] appearance-none cursor-pointer hover:border-[var(--brand)]/50 focus:outline-none focus:border-[var(--brand)]/60 transition-colors min-w-[200px] max-w-[260px]"
+          >
+            {deviceOptions.map(o => (
+              <option key={o.value} value={o.value}>{o.label}</option>
+            ))}
+          </select>
+
+          {/* Bulk actions — appear when rows selected */}
           <AnimatePresence>
             {selected.size > 0 && (
               <motion.div
-                className="flex items-center gap-2"
-                initial={{ opacity: 0, scale: 0.9, x: 8 }}
+                className="flex items-center gap-1.5"
+                initial={{ opacity: 0, scale: 0.92, x: 6 }}
                 animate={{ opacity: 1, scale: 1, x: 0 }}
-                exit={{ opacity: 0, scale: 0.9, x: 8 }}
+                exit={{ opacity: 0, scale: 0.92, x: 6 }}
               >
-                <Button variant="secondary" size="sm" icon={<Zap size={13} />} onClick={() => setBulkActiveOpen(true)}>
-                  {selected.size} ta active
+                <span className="text-[11px] text-[var(--text-secondary)] px-1">{selected.size} ta tanlandi</span>
+                <Button variant="secondary" size="sm" icon={<Zap size={12} />} onClick={() => setBulkActiveOpen(true)}>
+                  Active
                 </Button>
-                <Button variant="danger" size="sm" icon={<Trash2 size={13} />} onClick={() => setBulkDel(true)}>
-                  {selected.size} ta o'chirish
+                <Button variant="danger" size="sm" icon={<Trash2 size={12} />} onClick={() => setBulkDel(true)}>
+                  O'chirish
                 </Button>
               </motion.div>
             )}
           </AnimatePresence>
-          <Button variant="primary" icon={<Plus size={14} />} onClick={() => setOpen(true)}>
+
+          {/* Excel import */}
+          <Button
+            variant="secondary"
+            size="sm"
+            icon={<FileSpreadsheet size={13} />}
+            onClick={() => fileInputRef.current?.click()}
+            loading={importExcel.isPending}
+          >
+            Excel
+          </Button>
+          <input ref={fileInputRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={handleFileSelected} />
+
+          {/* Add signal */}
+          <Button variant="primary" size="sm" icon={<Plus size={13} />} onClick={() => setOpen(true)}>
             Signal qo'shish
           </Button>
         </div>

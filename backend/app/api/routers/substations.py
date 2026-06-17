@@ -1,13 +1,15 @@
 from fastapi import APIRouter, Body, Depends, HTTPException, Query, status
 from sqlalchemy import select, delete, func
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.api.dependencies import get_db
 from app.api.schemas import (
     SubstationCreate, SubstationOut, SubstationUpdate,
     SchemaUpsert, SchemaOut,
 )
-from app.infrastructure.db.models import Substation, SubstationSchema
+from app.application.services.yunusobod_schema import build_yunusobod_schema
+from app.infrastructure.db.models import Device, Substation, SubstationSchema
 
 router = APIRouter(prefix="/substations", tags=["substations"])
 
@@ -105,7 +107,34 @@ async def get_schema(sub_id: int, db: AsyncSession = Depends(get_db)):
     result = await db.execute(
         select(SubstationSchema).where(SubstationSchema.substation_id == sub_id)
     )
-    return result.scalar_one_or_none()
+    schema = result.scalar_one_or_none()
+    has_saved_nodes = bool((schema.canvas_json or {}).get("nodes")) if schema is not None else False
+    if has_saved_nodes:
+        return schema
+
+    sub = await db.get(Substation, sub_id)
+    if not sub:
+        raise HTTPException(status_code=404, detail="Substation not found")
+
+    is_yunusobod = sub_id == 5 or "yunusobod" in sub.name.lower()
+    if not is_yunusobod:
+        return None
+
+    devices = (await db.execute(
+        select(Device)
+        .options(selectinload(Device.signals))
+        .where(Device.substation_id == sub_id)
+        .order_by(Device.id)
+    )).scalars().all()
+    generated = build_yunusobod_schema(list(devices))
+    if schema is None:
+        schema = SubstationSchema(substation_id=sub_id, canvas_json=generated)
+        db.add(schema)
+    else:
+        schema.canvas_json = generated
+    await db.flush()
+    await db.refresh(schema)
+    return schema
 
 
 @router.put("/{sub_id}/schema", response_model=SchemaOut)

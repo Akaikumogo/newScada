@@ -1,7 +1,7 @@
 import { useState, useRef, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useInfiniteQuery, useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { useForm } from 'react-hook-form'
+import { useForm, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { Plus, Signal, Server, FileSpreadsheet, Trash2 } from 'lucide-react'
@@ -20,28 +20,33 @@ const deviceSchema = z.object({
   name:                    z.string().min(1, 'Nom kiriting').max(120),
   substation_id:           z.coerce.number().positive('Podstansiya tanlang'),
   model_id:                z.coerce.number().positive('Model tanlang'),
-  iec104_host:             z.string().regex(/^(\d{1,3}\.){3}\d{1,3}$/, 'IP manzil noto\'g\'ri (masalan: 192.168.1.10)'),
+  iec104_host:             z.string().regex(/^(\d{1,3}\.){3}\d{1,3}$/, 'Manzil noto\'g\'ri'),
   iec104_port:             z.coerce.number().int().min(1).max(65535, 'Port 1–65535 bo\'lsin'),
   iec104_common_address:   z.coerce.number().int().min(1).max(65535, 'CASDU 1–65535 bo\'lsin'),
-  poll_interval_seconds:   z.coerce.number().min(0.5, 'Minimal: 0.5 soniya'),
+  active:                  z.boolean().default(true),
 })
 type DeviceForm = z.infer<typeof deviceSchema>
 
-const columns: Column<Device>[] = [
-  { key: 'name', label: 'Qurilma nomi', render: row => (
-    <div>
-      <div className="text-[13px] font-medium text-[var(--text)]">{row.name}</div>
-      {row.model && <div className="text-[11px] text-[var(--text-secondary)] mt-0.5">{row.model.name}</div>}
-    </div>
-  )},
-  { key: 'iec104_host', label: 'IP : Port', render: row => (
-    <code className="mono text-[12px] bg-[var(--bg-hover)] px-2 py-0.5 rounded text-[var(--text-secondary)]">
-      {row.iec104_host}:{row.iec104_port}
-    </code>
-  )},
-  { key: 'iec104_common_address', label: 'CASDU', align: 'center', render: row => <span className="mono text-[13px]">{row.iec104_common_address}</span> },
-  { key: 'poll_interval_seconds', label: 'Interval', align: 'center', render: row => <span className="mono text-[13px]">{row.poll_interval_seconds}s</span> },
-]
+function DeviceActiveToggle({ row, onToggle, loading }: {
+  row: Device
+  onToggle: (active: boolean) => void
+  loading: boolean
+}) {
+  return (
+    <button
+      type="button"
+      disabled={loading}
+      onClick={e => { e.stopPropagation(); onToggle(!row.active) }}
+      className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors duration-150 ${
+        row.active ? 'bg-[var(--success)]' : 'bg-[var(--border)]'
+      } ${loading ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer hover:opacity-90'}`}
+    >
+      <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow-sm transition-transform duration-150 ${
+        row.active ? 'translate-x-[18px]' : 'translate-x-[2px]'
+      }`} />
+    </button>
+  )
+}
 
 function DeviceFormComponent({ defaultValues, onSubmit, substations, models }: {
   defaultValues?: Partial<DeviceForm>
@@ -49,9 +54,9 @@ function DeviceFormComponent({ defaultValues, onSubmit, substations, models }: {
   substations: { value: number; label: string }[]
   models: { value: number; label: string }[]
 }) {
-  const { register, handleSubmit, formState: { errors } } = useForm<DeviceForm>({
+  const { register, handleSubmit, control, formState: { errors } } = useForm<DeviceForm>({
     resolver: zodResolver(deviceSchema),
-    defaultValues: { iec104_port: 2404, poll_interval_seconds: 1.0, ...defaultValues },
+    defaultValues: { iec104_port: 2404, active: true, ...defaultValues },
   })
   return (
     <form id="device-form" onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4">
@@ -65,11 +70,39 @@ function DeviceFormComponent({ defaultValues, onSubmit, substations, models }: {
           <div className="flex-1 h-px bg-[var(--border)]" /> IEC 104 Ulanish <div className="flex-1 h-px bg-[var(--border)]" />
         </div>
         <div className="grid grid-cols-2 gap-3">
-          <Input label="IP manzil" required placeholder="192.168.199.10" mono error={errors.iec104_host?.message} hint="Qurilmaning tarmoq IP manzili" {...register('iec104_host')} />
+          <Input label="Tarmoq manzili" required placeholder="..." mono error={errors.iec104_host?.message} {...register('iec104_host')} />
           <Input label="Port" required type="number" placeholder="2404" mono error={errors.iec104_port?.message} {...register('iec104_port')} />
           <Input label="CASDU" required type="number" placeholder="1" mono hint="Common Address (1–65535)" error={errors.iec104_common_address?.message} {...register('iec104_common_address')} />
-          <Input label="So'rov intervali (sek)" required type="number" step="0.5" placeholder="2.0" mono hint="Minimal: 0.5" error={errors.poll_interval_seconds?.message} {...register('poll_interval_seconds')} />
         </div>
+      </div>
+
+      {/* IEC 104 ulanish holati */}
+      <div className="border-t border-[var(--border)] pt-3">
+        <Controller
+          control={control}
+          name="active"
+          render={({ field }) => (
+            <label className="flex items-center gap-3 cursor-pointer select-none p-3 rounded-lg hover:bg-[var(--bg-hover)] transition-colors">
+              <button
+                type="button"
+                onClick={() => field.onChange(!field.value)}
+                className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors duration-150 ${
+                  field.value ? 'bg-[var(--success)]' : 'bg-[var(--border)]'
+                }`}
+              >
+                <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow-sm transition-transform duration-150 ${
+                  field.value ? 'translate-x-[18px]' : 'translate-x-[2px]'
+                }`} />
+              </button>
+              <div>
+                <div className="text-[13px] font-medium text-[var(--text)]">IEC 104 ulanish faol</div>
+                <div className="text-[11px] text-[var(--text-secondary)]">
+                  {field.value ? 'Qurilmaga IEC 104 sessiyasi ochiladi' : 'Qurilma IEC ga ulanmaydi (trafik tejash)'}
+                </div>
+              </div>
+            </label>
+          )}
+        />
       </div>
     </form>
   )
@@ -137,6 +170,16 @@ export function DevicesPage() {
     onError: (e: Error) => toast.error(e.message),
   })
 
+  const toggleActive = useMutation({
+    mutationFn: ({ id, active }: { id: number; active: boolean }) =>
+      deviceApi.update(id, { active }),
+    onSuccess: (_res, { active }) => {
+      queryClient.invalidateQueries({ queryKey: ['devices-all'] })
+      toast.success(active ? 'Qurilma faollashtirildi' : 'Qurilma o\'chirildi (IEC ulanmaydi)')
+    },
+    onError: (e: Error) => toast.error(e.message),
+  })
+
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [uploadDeviceId, setUploadDeviceId] = useState<number | null>(null)
   const importMutation = useMutation({
@@ -157,6 +200,36 @@ export function DevicesPage() {
 
   const substationOptions = substations.map(s => ({ value: s.id, label: s.name }))
   const modelOptions = [{ value: 1, label: 'BMRZ-153' }, { value: 2, label: 'SIPROTEC-7SJ85' }]
+
+  const columns = useMemo<Column<Device>[]>(() => [
+    { key: 'name', label: 'Qurilma nomi', render: row => (
+      <div>
+        <div className={`text-[13px] font-medium ${row.active ? 'text-[var(--text)]' : 'text-[var(--text-secondary)] line-through opacity-60'}`}>{row.name}</div>
+        {row.model && <div className="text-[11px] text-[var(--text-secondary)] mt-0.5">{row.model.name}</div>}
+      </div>
+    )},
+    { key: 'iec104_host', label: 'Manzil', render: row => (
+      <span className={`mono text-[12px] bg-[var(--bg-hover)] px-2 py-0.5 rounded ${row.active ? 'text-[var(--text-secondary)]' : 'text-[var(--text-secondary)] opacity-50'}`}>
+        CASDU {row.iec104_common_address}
+      </span>
+    )},
+    { key: 'iec104_common_address', label: 'CASDU', align: 'center',
+      render: row => <span className="mono text-[13px]">{row.iec104_common_address}</span> },
+    { key: 'active', label: 'IEC', align: 'center', width: 'w-20',
+      render: row => (
+        <div className="flex flex-col items-center gap-0.5">
+          <DeviceActiveToggle
+            row={row}
+            loading={toggleActive.isPending && toggleActive.variables?.id === row.id}
+            onToggle={active => toggleActive.mutate({ id: row.id, active })}
+          />
+          <span className={`text-[10px] font-medium ${row.active ? 'text-[var(--success)]' : 'text-[var(--text-secondary)]'}`}>
+            {row.active ? 'faol' : 'off'}
+          </span>
+        </div>
+      ),
+    },
+  ], [toggleActive])
 
   return (
     <div className="p-6 flex flex-col gap-6">

@@ -108,8 +108,7 @@ export interface DeviceActivityOutage {
 export interface DeviceActivityDevice {
   device_id: number
   name: string
-  host: string
-  port: number
+  common_address?: number
   bucket_count: number
   active_buckets: number
   uptime_percent: number
@@ -126,6 +125,53 @@ export interface DeviceActivityResponse {
   to_ts: string
   bucket_sec: number
   devices: DeviceActivityDevice[]
+}
+
+export interface YunusobodEvidenceRow {
+  device_id: number | null
+  device_name: string
+  signal_id: number | null
+  signal_name: string
+  raw_value: number | null
+  value_mw: number | null
+  quality: number | null
+  ts: string | null
+  included_in_balance: boolean
+  balance_rule: string
+  object: string
+  role: string
+  evidence: {
+    ip: string
+    port: number
+    asdu_address: number
+    ioa: number
+    iec104_type: string
+    source_file: string
+    prd: string
+    sld_html: string
+    sld_svg: string
+    sld_pdf: string
+    model_pdf: string
+    param: string
+    group: string
+  }
+}
+
+export interface YunusobodBalance {
+  substation_id: number | null
+  calculated_at: string
+  quality: 'Bad' | 'MissingRealtime' | 'Partial' | string
+  complete_sources: boolean
+  status_note: string
+  totals: {
+    P_kirish_mw: number
+    P35_out_mw: number
+    P_yoqotish_mw: number | null
+    loss_percent: number | null
+  }
+  missing_realtime_points: number
+  bad_quality_points: number
+  evidence: YunusobodEvidenceRow[]
 }
 
 export const telemetryApi = {
@@ -257,6 +303,30 @@ export const telemetryApi = {
     return request<HistoryPoint[]>(`/telemetry/history/page?${qs}`, { signal })
   },
 
+  /** First and last recorded value within a time range — for delta (kunlik kirish) formulas */
+  firstLast: (
+    params: {
+      device_id:   number
+      signal_name: string
+      from_ts:     Date | string
+      to_ts:       Date | string
+    },
+    signal?: AbortSignal,
+  ) => {
+    const qs = new URLSearchParams({
+      device_id:   String(params.device_id),
+      signal_name: params.signal_name,
+      from_ts:     params.from_ts instanceof Date ? params.from_ts.toISOString() : params.from_ts,
+      to_ts:       params.to_ts   instanceof Date ? params.to_ts.toISOString()   : params.to_ts,
+    })
+    return request<{
+      first:    number | null
+      last:     number | null
+      first_ts: string | null
+      last_ts:  string | null
+    }>(`/telemetry/first-last?${qs}`, { signal })
+  },
+
   deviceActivity: (
     params: {
       from_ts: Date | string
@@ -275,4 +345,12 @@ export const telemetryApi = {
     if (params.bucket_sec != null) qs.set('bucket_sec', String(params.bucket_sec))
     return request<DeviceActivityResponse>(`/telemetry/device-activity?${qs}`, { signal })
   },
+}
+
+export const yunusobodApi = {
+  balance: (substationId?: number, signal?: AbortSignal) =>
+    request<YunusobodBalance>(
+      `/yunusobod/balance${substationId ? `?substation_id=${substationId}` : ''}`,
+      { signal },
+    ),
 }

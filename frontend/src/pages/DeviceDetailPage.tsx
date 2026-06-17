@@ -2,7 +2,7 @@ import { useMemo, lazy, Suspense } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import {
-  ArrowLeft, Activity, Server, Cpu,
+  ArrowLeft, Activity, Cpu,
   Wifi, WifiOff, Loader2,
 } from 'lucide-react'
 import { deviceApi } from '@/lib/api'
@@ -99,9 +99,8 @@ export function DeviceDetailPage() {
                 <StatusBadge status={status} size="sm" />
               </div>
               <div className="flex items-center gap-2 mt-0.5">
-                <Server size={11} className="text-ink-300" />
                 <code className="text-[11px] font-mono text-ink-300">
-                  {device?.iec104_host}:{device?.iec104_port} · CASDU {device?.iec104_common_address}
+                  CASDU {device?.iec104_common_address}
                 </code>
                 <span className="text-ink-300/30">·</span>
                 <span className="text-[11px] text-ink-300">

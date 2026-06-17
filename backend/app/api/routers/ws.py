@@ -12,8 +12,6 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["websocket"])
 
-PING_INTERVAL = 20
-
 
 @router.websocket("/ws")
 async def websocket_endpoint(ws: WebSocket):
@@ -23,10 +21,7 @@ async def websocket_endpoint(ws: WebSocket):
 
     try:
         while True:
-            try:
-                event = await asyncio.wait_for(queue.get(), timeout=PING_INTERVAL)
-            except asyncio.TimeoutError:
-                event = {"type": "ping"}
+            event = await queue.get()
             await ws.send_json(event)
     except (WebSocketDisconnect, Exception):
         pass
@@ -58,11 +53,7 @@ async def log_websocket_endpoint(
         })
 
         while True:
-            try:
-                event = await asyncio.wait_for(queue.get(), timeout=PING_INTERVAL)
-            except asyncio.TimeoutError:
-                await ws.send_json({"type": "ping"})
-                continue
+            event = await queue.get()
 
             if matches_log_filter(
                 event,

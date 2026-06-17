@@ -33,7 +33,8 @@ export interface Device {
   iec104_host: string
   iec104_port: number
   iec104_common_address: number
-  poll_interval_seconds: number
+  poll_interval_seconds?: number
+  active: boolean
   created_at: string
   signals: Signal[]    // always included from backend (selectinload)
 }
@@ -45,7 +46,7 @@ export interface Signal {
   signal_name: string
   signal_title?: string | null
   unit: string
-  value_type: 'float' | 'status'
+  value_type: 'float' | 'status' | 'counter'
   active: boolean
   only_realtime: boolean
 }

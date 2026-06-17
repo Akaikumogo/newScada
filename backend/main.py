@@ -26,6 +26,7 @@ from app.api.routers import (
     devices,
     signals,
     telemetry,
+    yunusobod,
     logs,
     ws,
 )
@@ -113,7 +114,7 @@ app.add_middleware(
     allow_origins=settings.ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
-    allow_headers=["*"],
+    allow_headers=["*"]
 )
 
 # ──────────────────────────────────────────────
@@ -129,6 +130,7 @@ app.include_router(models.router,       prefix=API_PREFIX)
 app.include_router(devices.router,      prefix=API_PREFIX)
 app.include_router(signals.router,      prefix=API_PREFIX)
 app.include_router(telemetry.router,    prefix=API_PREFIX)
+app.include_router(yunusobod.router,    prefix=API_PREFIX)
 app.include_router(logs.router,         prefix=API_PREFIX)
 app.include_router(ws.router)           # no prefix — mounts at /ws
 

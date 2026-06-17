@@ -36,7 +36,7 @@ function RealtimeRow({ device, signal }: { device: Device; signal: Signal }) {
     <tr className="border-b border-[var(--border)] last:border-0">
       <td className="px-4 py-2.5">
         <div className="text-[13px] font-medium text-[var(--text)]">{device.name}</div>
-        <code className="text-[11px] text-ink-300">{device.iec104_host}:{device.iec104_port}</code>
+        <div className="text-[11px] text-ink-300">CASDU {device.iec104_common_address}</div>
       </td>
       <td className="px-4 py-2.5">
         <div className="text-[13px] text-ink-200">{signal.signal_name}</div>

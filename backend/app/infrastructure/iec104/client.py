@@ -196,9 +196,9 @@ def _parse_apdu(apdu: bytes, state: Iec104State) -> tuple[list[SignalValue], dic
 
     if type_id == 100:
         status = "actcon" if cot == 7 else ("actterm" if cot == 10 else f"cot={cot}")
-        return [], {"type": "GI", "status": status, "negative": bool(pn), "casdu": casdu}
+        return [], {"type": "GI", "status": status, "negative": bool(pn), "casdu": casdu, "cot": cot}
     if type_id == 70:
-        return [], {"type": "M_EI_NA_1", "status": "initialized", "casdu": casdu}
+        return [], {"type": "M_EI_NA_1", "status": "initialized", "casdu": casdu, "cot": cot}
 
     rows: list[SignalValue] = []
     ioa = 0
@@ -279,7 +279,7 @@ def _parse_apdu(apdu: bytes, state: Iec104State) -> tuple[list[SignalValue], dic
             )
         )
 
-    return rows, None
+    return rows, {"cot": cot}
 
 
 def _parse_cp56(raw: bytes) -> str | None:

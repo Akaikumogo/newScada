@@ -105,7 +105,7 @@ class Device(Base):
     iec104_host:           Mapped[str]   = mapped_column(String(64), nullable=False, default="127.0.0.1")
     iec104_port:           Mapped[int]   = mapped_column(Integer, nullable=False, default=2404)
     iec104_common_address: Mapped[int]   = mapped_column(Integer, nullable=False, default=1)
-    poll_interval_seconds: Mapped[float] = mapped_column(Float, nullable=False, default=1.0)
+    active:                Mapped[bool]  = mapped_column(Boolean, nullable=False, default=True)
     created_at:            Mapped[datetime] = mapped_column(TZ, server_default=func.now(), nullable=False)
 
     substation: Mapped["Substation"]       = relationship(back_populates="devices")

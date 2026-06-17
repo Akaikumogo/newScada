@@ -180,6 +180,7 @@ function FleetHeatmap({
   devices: DeviceActivityDevice[]
   bucketSec: number
 }) {
+  const now = useMemo(() => Date.now(), [])
   const [hoveredBucket, setHoveredBucket] = useState<number | null>(null)
   const [hoveredRow, setHoveredRow] = useState<number | null>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -273,7 +274,7 @@ function FleetHeatmap({
                     color: hoveredRow === di ? '#fff' : undefined,
                     fontWeight: hoveredRow === di ? 600 : 400,
                   }}
-                  title={`${device.name} (${device.host}:${device.port})`}
+                  title={`${device.name} (CASDU ${device.common_address ?? '—'})`}
                 >
                   {device.name}
                 </span>
@@ -306,16 +307,23 @@ function FleetHeatmap({
                       {device.timeline.map((bucket, bi) => {
                         const isHot = bi === hoveredBucket
                         const isInSeg = seg && bi >= seg.start && bi <= seg.end && hoveredRow === di
+                        const isFuture = new Date(bucket.ts).getTime() > now
+                        const bgColor = isFuture
+                          ? 'rgba(255,255,255,0.07)'
+                          : bucket.active ? '#00D68F' : '#FF3D71'
+                        const opacity = isFuture
+                          ? (isHot ? 0.18 : 0.07)
+                          : isHot ? 1 : isInSeg ? 0.85 : bucket.active ? 0.6 : 0.45
                         return (
                           <div
                             key={bi}
                             className="flex-1 rounded-[1px]"
                             style={{
                               minWidth: 2,
-                              backgroundColor: bucket.active ? '#00D68F' : '#FF3D71',
-                              opacity: isHot ? 1 : isInSeg ? 0.85 : bucket.active ? 0.6 : 0.45,
-                              transform: isHot ? 'scaleY(1.4)' : 'scaleY(1)',
-                              boxShadow: isHot
+                              backgroundColor: bgColor,
+                              opacity,
+                              transform: isHot && !isFuture ? 'scaleY(1.4)' : 'scaleY(1)',
+                              boxShadow: isHot && !isFuture
                                 ? `0 0 5px ${bucket.active ? '#00D68F' : '#FF3D71'}`
                                 : 'none',
                               transition: 'opacity 75ms, transform 75ms, box-shadow 75ms',
@@ -488,6 +496,7 @@ function InteractiveTimeline({
   height?: number
   tickCount?: number
 }) {
+  const now = useMemo(() => Date.now(), [])
   const [hovered, setHovered] = useState<number | null>(null)
   const barRef = useRef<HTMLDivElement>(null)
   const total = timeline.length
@@ -532,16 +541,25 @@ function InteractiveTimeline({
       >
         {timeline.map((bucket, bi) => {
           const isHot = bi === hovered
+          const isFuture = new Date(bucket.ts).getTime() > now
+          const bgColor = isFuture
+            ? 'rgba(255,255,255,0.07)'
+            : bucket.active ? '#00D68F' : '#FF3D71'
+          const opacity = isFuture
+            ? (isHot ? 0.18 : 0.07)
+            : isHot ? 1 : bucket.active ? 0.65 : 0.5
           return (
             <div
               key={bi}
               className="flex-1 rounded-[1px] transition-all duration-75"
               style={{
                 minWidth: 1,
-                backgroundColor: bucket.active ? '#00D68F' : '#FF3D71',
-                opacity: isHot ? 1 : bucket.active ? 0.65 : 0.5,
-                transform: isHot ? 'scaleY(1.4)' : 'scaleY(1)',
-                boxShadow: isHot ? `0 0 5px ${bucket.active ? '#00D68F' : '#FF3D71'}` : 'none',
+                backgroundColor: bgColor,
+                opacity,
+                transform: isHot && !isFuture ? 'scaleY(1.4)' : 'scaleY(1)',
+                boxShadow: isHot && !isFuture
+                  ? `0 0 5px ${bucket.active ? '#00D68F' : '#FF3D71'}`
+                  : 'none',
               }}
             />
           )
@@ -628,7 +646,7 @@ function DeviceActivityRow({
             <ActivityTone device={device} />
           </div>
           <div className="mt-0.5 text-[10px] text-ink-300 font-mono">
-            {device.host}:{device.port}
+            CASDU {device.common_address ?? '—'}
             <span className="mx-1.5 opacity-40">·</span>
             {device.total_records.toLocaleString()} records
             <span className="mx-1.5 opacity-40">·</span>

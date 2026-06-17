@@ -1,4 +1,4 @@
-import { memo, useMemo } from 'react'
+import { memo, useMemo, useState, useEffect, useRef } from 'react'
 import { motion } from 'framer-motion'
 import { useQuery } from '@tanstack/react-query'
 import {
@@ -175,8 +175,9 @@ export const SignalChart = memo(function SignalChart({
   deviceId, signal, timeRange, index,
 }: SignalChartProps) {
   const cfg = RANGE_CONFIG[timeRange]
-  const now = useLiveNow()
-  const toTs = roundedQueryDate(now)
+  // Tick every 30s, round to 120s steps → charts refetch every ~2 min
+  const now = useLiveNow(true, 30_000)
+  const toTs = roundedQueryDate(now, 120_000)
   const fromTs = useMemo(() => new Date(toTs.getTime() - presetMs(timeRange)), [timeRange, toTs])
 
   const { data = [], isLoading, isError } = useQuery({
@@ -188,7 +189,7 @@ export const SignalChart = memo(function SignalChart({
       to_ts:       toTs,
       target_points: 900,
     }, abortSignal),
-    staleTime: 25_000,
+    staleTime: 110_000,  // slightly less than 120s round step
   })
 
   const { values, min, max, avg, trend, chartData } = useMemo(() => {
@@ -344,5 +345,58 @@ export const SignalChart = memo(function SignalChart({
         </div>
       )}
     </motion.div>
+  )
+})
+
+// ── Lazy wrapper — only renders chart when near viewport ──────────────
+
+function LazyPlaceholder({ signal }: { signal: Signal }) {
+  return (
+    <div className="chart-frame overflow-hidden">
+      <div className="flex items-center gap-2 px-4 pt-3.5 pb-2 border-b border-[var(--border)] bg-[var(--bg-elevated)]/40">
+        <div className="w-1 h-5 rounded-full bg-[#2979FF]" />
+        <span className="text-[13px] font-semibold text-[var(--text)]">{signal.signal_name}</span>
+        {signal.signal_title && (
+          <span className="text-[11px] text-ink-300 ml-1">{signal.signal_title}</span>
+        )}
+        {signal.unit && (
+          <span className="text-[11px] text-ink-300/60 ml-auto">{signal.unit}</span>
+        )}
+      </div>
+      <div className="px-2 pt-2 pb-1 bg-[var(--bg-base)]/20">
+        <ChartSkeleton />
+      </div>
+    </div>
+  )
+}
+
+export const LazySignalChart = memo(function LazySignalChart(props: SignalChartProps) {
+  const ref = useRef<HTMLDivElement>(null)
+  const [visible, setVisible] = useState(false)
+
+  useEffect(() => {
+    const el = ref.current
+    if (!el) return
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setVisible(true)
+          observer.disconnect()
+        }
+      },
+      {
+        // rootMargin: prefetch when within ~800px (~3 rows) of viewport
+        rootMargin: '800px 0px',
+      },
+    )
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [])
+
+  return (
+    <div ref={ref}>
+      {visible ? <SignalChart {...props} /> : <LazyPlaceholder signal={props.signal} />}
+    </div>
   )
 })

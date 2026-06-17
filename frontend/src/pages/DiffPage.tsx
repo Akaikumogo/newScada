@@ -364,8 +364,8 @@ export function DiffPage() {
 
   // ── Time range state ─────────────────────────────
   const [fromTs, setFromTs] = useState<Date>(() => new Date(Date.now() - 86400_000))
-  const toTs = useLiveNow()
-  const queryToTs = useMemo(() => roundedQueryDate(toTs), [toTs])
+  const toTs = useLiveNow(true, 30_000)
+  const queryToTs = useMemo(() => roundedQueryDate(toTs, 120_000), [toTs])
   const [activeRange, setActiveRange] = useState<HistoryRange | null>('1d')
 
   // ── UI state ─────────────────────────────────────
@@ -917,11 +917,9 @@ export function DiffPage() {
                               <WifiOff size={9} className="text-[#FF3D71] flex-shrink-0" />
                             )}
                           </div>
-                          {dev?.iec104_host && dev.iec104_host !== dev.name && (
-                            <span className="text-[9px] font-mono text-ink-300/60 truncate block">
-                              {dev.iec104_host}
-                            </span>
-                          )}
+                          <span className="text-[9px] font-mono text-ink-300/60 truncate block">
+                            CASDU {dev?.iec104_common_address}
+                          </span>
                           {matchedSignal && (
                             <div className="mt-0.5 flex items-center justify-between gap-2">
                               <span className="text-[9px] font-mono text-ink-300/70 truncate">

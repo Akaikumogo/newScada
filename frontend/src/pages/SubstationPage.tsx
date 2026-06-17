@@ -1,26 +1,28 @@
-import { useEffect, useMemo, useCallback } from 'react'
+import { useEffect, useMemo, useCallback, type ElementType } from 'react'
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useQuery } from '@tanstack/react-query'
 import {
   ArrowLeft, Network, LayoutGrid, BarChart2, Table2,
   ChevronDown, Wifi, WifiOff, Search, GitCompare, Activity,
+  Sigma, FileCheck2,
 } from 'lucide-react'
 import { DeviceCard, DeviceCardSkeleton } from '@/components/dispatcher/DeviceCard'
 import { DeviceActivity } from '@/components/dispatcher/DeviceActivity'
-import { SignalChart, type TimeRange } from '@/components/dispatcher/SignalChart'
+import { LazySignalChart, type TimeRange } from '@/components/dispatcher/SignalChart'
 import { HistoryTable } from '@/components/dispatcher/HistoryTable'
 import { StatusBadge } from '@/components/dispatcher/StatusBadge'
-import { deviceApi, substationApi, telemetryApi } from '@/lib/api'
+import { deviceApi, substationApi, telemetryApi, yunusobodApi, type YunusobodBalance } from '@/lib/api'
 import { RANGE_PRESETS } from '@/lib/timeRange'
 import { useDispatcherStore } from '@/store/dispatcher'
 import type { Device } from '@/types'
 
 // ── Tabs ─────────────────────────────────────────
-type Tab = 'monitoring' | 'activity' | 'charts' | 'table'
+type Tab = 'monitoring' | 'balance' | 'activity' | 'charts' | 'table'
 
-const TABS: { value: Tab; icon: React.ElementType; label: string }[] = [
+const TABS: { value: Tab; icon: ElementType; label: string }[] = [
   { value: 'monitoring', icon: LayoutGrid, label: 'Monitoring' },
+  { value: 'balance',    icon: Sigma,      label: 'Balans' },
   { value: 'activity',   icon: Activity,   label: 'Activity' },
   { value: 'charts',     icon: BarChart2,  label: 'Grafiklar' },
   { value: 'table',      icon: Table2,     label: 'Jadval' },
@@ -78,7 +80,7 @@ function DeviceSelector({
         <option value="">Qurilma tanlang...</option>
         {devices.map(d => (
           <option key={d.id} value={d.id}>
-            {d.name} — {d.iec104_host}
+            {d.name} — CASDU {d.iec104_common_address}
           </option>
         ))}
       </select>
@@ -94,7 +96,7 @@ function DeviceSelector({
 function TabButton({
   active, icon: Icon, label, count, onClick,
 }: {
-  active: boolean; icon: React.ElementType; label: string; count?: number; onClick: () => void
+  active: boolean; icon: ElementType; label: string; count?: number; onClick: () => void
 }) {
   return (
     <button
@@ -123,6 +125,164 @@ function TabButton({
         />
       )}
     </button>
+  )
+}
+
+function fmtMw(v: number | null | undefined): string {
+  if (v == null || Number.isNaN(v)) return '-'
+  return `${v.toFixed(3)} MW`
+}
+
+function fmtRaw(v: number | null | undefined): string {
+  if (v == null || Number.isNaN(v)) return '-'
+  return Math.abs(v) >= 100 ? v.toFixed(2) : v.toFixed(4)
+}
+
+function QualityPill({ value }: { value: string }) {
+  const good = value === 'Partial'
+  const bad = value === 'Bad'
+  return (
+    <span className={`
+      inline-flex h-7 items-center px-2.5 rounded-lg border text-[12px] font-medium
+      ${good ? 'border-[#00D68F]/30 bg-[#00D68F]/10 text-[#00D68F]' :
+        bad ? 'border-[#FF3D71]/30 bg-[#FF3D71]/10 text-[#FF3D71]' :
+        'border-[#FFAA00]/30 bg-[#FFAA00]/10 text-[#FFAA00]'}
+    `}>
+      {value}
+    </span>
+  )
+}
+
+function Metric({ title, value }: { title: string; value: string }) {
+  return (
+    <div className="metric-tile p-4">
+      <div className="text-[11px] uppercase tracking-wider text-ink-300">{title}</div>
+      <div className="mt-2 text-[22px] font-mono font-semibold text-[var(--text)]">{value}</div>
+    </div>
+  )
+}
+
+function Th({ children }: { children: React.ReactNode }) {
+  return <th className="px-3 py-2 font-medium border-b border-[var(--border)]">{children}</th>
+}
+
+function Td({ children, className = '' }: { children: React.ReactNode; className?: string }) {
+  return <td className={`px-3 py-2 align-top ${className}`}>{children}</td>
+}
+
+function BalancePanel({ substationId }: { substationId: number }) {
+  const { data, isLoading } = useQuery({
+    queryKey: ['yunusobod-balance', substationId],
+    queryFn: ({ signal }) => yunusobodApi.balance(substationId, signal),
+    enabled: !!substationId,
+    refetchInterval: 5000,
+  })
+
+  const balance = data as YunusobodBalance | undefined
+  const rows = balance?.evidence ?? []
+  const includedRows = rows.filter(r => r.included_in_balance)
+
+  if (isLoading || !balance) {
+    return (
+      <div className="p-6 grid gap-4" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))' }}>
+        {Array.from({ length: 4 }).map((_, i) => <div key={i} className="skeleton h-28 rounded-xl" />)}
+      </div>
+    )
+  }
+
+  return (
+    <motion.div
+      key="balance"
+      className="p-6 flex flex-col gap-5"
+      initial={{ opacity: 0, y: 6 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -4 }}
+      transition={{ duration: 0.2 }}
+    >
+      <div className="flex items-center justify-between gap-4 flex-wrap">
+        <div className="flex items-center gap-3">
+          <Sigma size={16} className="text-[var(--electric)]" />
+          <span className="text-[14px] font-medium text-[var(--text)]">Yunusobod quvvat balansi</span>
+          <QualityPill value={balance.quality} />
+        </div>
+        <div className="flex items-center gap-2 text-[11px] text-ink-300">
+          <FileCheck2 size={13} className="text-[#00D68F]" />
+          <span>{includedRows.length} ta P nuqta isbot bilan</span>
+        </div>
+      </div>
+
+      <div className="grid gap-4" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))' }}>
+        <Metric title="Kirish" value={fmtMw(balance.totals.P_kirish_mw)} />
+        <Metric title="35 kV chiqish" value={fmtMw(balance.totals.P35_out_mw)} />
+        <Metric title="Yo'qotish" value={fmtMw(balance.totals.P_yoqotish_mw)} />
+        <Metric title="Yo'qotish %" value={balance.totals.loss_percent == null ? '-' : `${balance.totals.loss_percent.toFixed(2)}%`} />
+      </div>
+
+      <div className="scada-toolbar p-3 text-[12px] text-ink-300 leading-5">
+        {balance.status_note}
+        {balance.missing_realtime_points > 0 && (
+          <span className="ml-2 text-[#FFAA00]">
+            Realtime kelmagan P nuqta: {balance.missing_realtime_points}.
+          </span>
+        )}
+      </div>
+
+      <div className="glass-card rounded-xl overflow-hidden">
+        <div className="px-4 py-3 border-b border-[var(--border)] flex items-center justify-between">
+          <span className="text-[13px] font-semibold text-[var(--text)]">Register isboti</span>
+          <span className="text-[11px] text-ink-300">ASDU / IOA / source file</span>
+        </div>
+        <div className="overflow-auto max-h-[calc(100vh-390px)]">
+          <table className="w-full text-left text-[12px]">
+            <thead className="sticky top-0 bg-[var(--bg-card)] text-ink-300">
+              <tr>
+                <Th>Obyekt</Th>
+                <Th>Qoida</Th>
+                <Th>Qiymat</Th>
+                <Th>Register</Th>
+                <Th>Manba</Th>
+                <Th>Vaqt</Th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((row, i) => (
+                <tr key={`${row.evidence.ip}-${row.evidence.ioa}-${i}`} className="border-t border-[var(--border)]">
+                  <Td>
+                    <div className="font-medium text-[var(--text)]">{row.object}</div>
+                    <div className="text-[10px] text-ink-300">{row.device_name}</div>
+                  </Td>
+                  <Td>
+                    <span className={row.included_in_balance ? 'text-[#00D68F]' : 'text-ink-300'}>
+                      {row.balance_rule}
+                    </span>
+                  </Td>
+                  <Td>
+                    <div className="font-mono text-[var(--text)]">{fmtMw(row.value_mw)}</div>
+                    <div className="text-[10px] text-ink-300">raw {fmtRaw(row.raw_value)}</div>
+                  </Td>
+                  <Td>
+                    <code className="text-[11px] text-ink-200">
+                      ASDU {row.evidence.asdu_address} / IOA {row.evidence.ioa}
+                    </code>
+                    <div className="text-[10px] text-ink-300">{row.evidence.iec104_type} - {row.evidence.param}</div>
+                  </Td>
+                  <Td className="max-w-[260px]">
+                    <div className="truncate text-ink-200">{row.evidence.source_file}</div>
+                    <div className="truncate text-[10px] text-ink-300">{row.evidence.prd}</div>
+                  </Td>
+                  <Td>
+                    <span className={row.ts ? 'text-ink-200' : 'text-[#FFAA00]'}>
+                      {row.ts ? new Date(row.ts).toLocaleString() : 'realtime yoq'}
+                    </span>
+                    <div className="text-[10px] text-ink-300">Q{row.quality ?? '-'}</div>
+                  </Td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </motion.div>
   )
 }
 
@@ -216,23 +376,25 @@ export function SubstationPage() {
 
   // Auto-select first device for charts/table when devices load
   useEffect(() => {
-    if (devices.length && selectedDevice === null && tab !== 'monitoring') {
+    if (devices.length && selectedDevice === null && (tab === 'charts' || tab === 'table')) {
       setSelectedDevice(devices[0].id)
     }
   }, [devices, selectedDevice, tab, setSelectedDevice])
 
   // ── Computed values ────────────────────────────
   const { onlineCount, offlineCount } = useMemo(() => {
-    const online  = devices.filter(d => statuses[d.id]?.status === 'online').length
-    const offline = devices.filter(d => statuses[d.id]?.status === 'offline').length
+    const activeDevices = devices.filter(d => d.active !== false)
+    const online  = activeDevices.filter(d => statuses[d.id]?.status === 'online').length
+    const offline = activeDevices.filter(d => statuses[d.id]?.status === 'offline').length
     return { onlineCount: online, offlineCount: offline }
   }, [devices, statuses])
 
-  // Filter devices by search query (monitoring tab)
+  // Filter devices by search query (monitoring tab) — inactive devices hidden
   const filteredDevices = useMemo(() => {
-    if (!searchQuery.trim()) return devices
+    const active = devices.filter(d => d.active !== false)
+    if (!searchQuery.trim()) return active
     const needle = searchQuery.toLowerCase()
-    return devices.filter(d =>
+    return active.filter(d =>
       d.name.toLowerCase().includes(needle) ||
       d.iec104_host.includes(needle) ||
       d.signals?.some(s =>
@@ -362,7 +524,7 @@ export function SubstationPage() {
               active={tab === t.value}
               icon={t.icon}
               label={t.label}
-              count={t.value === 'monitoring' ? devices.length : undefined}
+              count={t.value === 'monitoring' ? filteredDevices.length : undefined}
               onClick={() => setTab(t.value)}
             />
           ))}
@@ -410,7 +572,7 @@ export function SubstationPage() {
               ) : (
                 <div
                   className="grid gap-4"
-                  style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))' }}
+                  style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(350px, 2fr))' }}
                 >
                   {filteredDevices.map((device, i) => (
                     <DeviceCard key={device.id} device={device} index={i} />
@@ -418,6 +580,10 @@ export function SubstationPage() {
                 </div>
               )}
             </motion.div>
+          )}
+
+          {tab === 'balance' && (
+            <BalancePanel substationId={substationId} />
           )}
 
           {/* ── CHARTS TAB ──────────────────────── */}
@@ -461,7 +627,7 @@ export function SubstationPage() {
                 <div className="scada-toolbar flex items-center gap-3 p-3">
                   <StatusBadge status={statuses[chartDevice.id]?.status ?? 'unknown'} size="sm" />
                   <code className="text-[11px] font-mono text-ink-300">
-                    {chartDevice.iec104_host}:{chartDevice.iec104_port} · CASDU {chartDevice.iec104_common_address}
+                    CASDU {chartDevice.iec104_common_address}
                   </code>
                   <span className="text-[11px] text-ink-300">
                     · {chartSignals.length} ta signal
@@ -493,7 +659,7 @@ export function SubstationPage() {
               ) : (
                 <div className="grid gap-4" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(440px, 1fr))' }}>
                   {chartSignals.map((sig, i) => (
-                    <SignalChart
+                    <LazySignalChart
                       key={sig.id}
                       deviceId={chartDevice.id}
                       signal={sig}
@@ -535,7 +701,7 @@ export function SubstationPage() {
                 <div className="scada-toolbar flex items-center gap-3 p-3">
                   <StatusBadge status={statuses[chartDevice.id]?.status ?? 'unknown'} size="sm" />
                   <code className="text-[11px] font-mono text-ink-300">
-                    {chartDevice.iec104_host}:{chartDevice.iec104_port} · CASDU {chartDevice.iec104_common_address}
+                    CASDU {chartDevice.iec104_common_address}
                   </code>
                   <span className="text-[11px] text-ink-300">
                     · {chartSignals.length} ta signal

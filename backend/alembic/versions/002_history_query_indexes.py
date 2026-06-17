@@ -8,7 +8,7 @@ from alembic import op
 
 
 revision = "002_history_query_indexes"
-down_revision = "001_signal_active_realtime"
+down_revision = "001"
 branch_labels = None
 depends_on = None
 

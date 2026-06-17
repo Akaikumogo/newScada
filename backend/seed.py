@@ -6,6 +6,7 @@ import asyncio
 from sqlalchemy import select, text
 from app.infrastructure.db.database import AsyncSessionFactory, create_tables
 from app.infrastructure.db.models import Branch, Substation, DeviceModel, Device, DeviceSignal
+from import_yunusobod import import_yunusobod
 
 
 BRANCHES = [
@@ -55,7 +56,8 @@ async def seed():
         # Check if already seeded
         existing = (await session.execute(select(Branch))).scalars().first()
         if existing:
-            print("DB already has data — skipping seed.")
+            print("DB already has data — skipping demo seed and refreshing Yunusobod import.")
+            await import_yunusobod()
             return
 
         print("Seeding branches...")
@@ -92,7 +94,6 @@ async def seed():
                     iec104_host=f"192.168.{sub.id}.{dev_tmpl['host_suffix']}",
                     iec104_port=2404,
                     iec104_common_address=device_counter,
-                    poll_interval_seconds=2.0,
                 )
                 session.add(device)
                 await session.flush()
@@ -109,6 +110,8 @@ async def seed():
                 device_counter += 1
 
         await session.commit()
+
+    await import_yunusobod()
 
     print(f"✓ Seeded {len(BRANCHES)} branches, {len(SUBSTATIONS)} substations, "
           f"{len(SUBSTATIONS) * len(DEVICES_TEMPLATE)} devices, "

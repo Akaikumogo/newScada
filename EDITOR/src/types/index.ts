@@ -10,7 +10,7 @@ export interface ModelSignal {
   signal_name:   string
   signal_title?: string
   unit:          string
-  value_type:    'float' | 'status'
+  value_type:    'float' | 'status' | 'counter'
 }
 
 export interface ApplyResult {
@@ -29,7 +29,7 @@ export interface Device {
   iec104_host: string
   iec104_port: number
   iec104_common_address: number
-  poll_interval_seconds: number
+  active: boolean
   created_at: string
   signals?: Signal[]
 }
@@ -41,7 +41,7 @@ export interface Signal {
   signal_name: string
   signal_title?: string
   unit: string
-  value_type: 'float' | 'status'
+  value_type: 'float' | 'status' | 'counter'
   active: boolean
   only_realtime: boolean
 }

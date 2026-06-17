@@ -13,7 +13,6 @@ type BatchHandler = (msgs: WsMessage[]) => void
 type StateHandler = (state: 'connected' | 'connecting' | 'disconnected') => void
 
 const RETRY_DELAYS = [1000, 2000, 4000, 8000, 15000]
-const PING_INTERVAL = 25_000
 
 class WsClient {
   private socket: WebSocket | null = null
@@ -21,7 +20,6 @@ class WsClient {
   private stateHandlers: Set<StateHandler> = new Set()
   private retryCount = 0
   private retryTimer?: ReturnType<typeof setTimeout>
-  private pingTimer?: ReturnType<typeof setInterval>
   private url = ''
 
   // ── Frame batching ─────────────────────────────
@@ -45,7 +43,6 @@ class WsClient {
     this.socket.onopen = () => {
       this.retryCount = 0
       this.setState('connected')
-      this.startPing()
     }
 
     this.socket.onmessage = (e) => {
@@ -57,7 +54,6 @@ class WsClient {
     }
 
     this.socket.onclose = () => {
-      this.stopPing()
       this.flushNow() // deliver any remaining
       this.setState('disconnected')
       this.scheduleRetry()
@@ -95,18 +91,6 @@ class WsClient {
     }, delay)
   }
 
-  private startPing() {
-    this.pingTimer = setInterval(() => {
-      if (this.socket?.readyState === WebSocket.OPEN) {
-        this.socket.send(JSON.stringify({ type: 'ping' }))
-      }
-    }, PING_INTERVAL)
-  }
-
-  private stopPing() {
-    if (this.pingTimer) { clearInterval(this.pingTimer); this.pingTimer = undefined }
-  }
-
   private setState(state: 'connected' | 'connecting' | 'disconnected') {
     this.stateHandlers.forEach(h => h(state))
   }
@@ -122,7 +106,6 @@ class WsClient {
   }
 
   disconnect() {
-    this.stopPing()
     if (this.rafId !== null) { cancelAnimationFrame(this.rafId); this.rafId = null }
     this.flushNow()
     clearTimeout(this.retryTimer)

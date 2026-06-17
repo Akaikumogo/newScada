@@ -207,9 +207,9 @@ export function TradingChart({
   const [fromTs, setFromTs] = useState<Date>(() =>
     initialFromTs ?? new Date(Date.now() - 365 * 86400_000)
   )
-  const liveNow = useLiveNow(!initialToTs)
+  const liveNow = useLiveNow(!initialToTs, 30_000)
   const toTs = initialToTs ?? liveNow
-  const queryToTs = useMemo(() => roundedQueryDate(toTs), [toTs])
+  const queryToTs = useMemo(() => roundedQueryDate(toTs, 120_000), [toTs])
   const [activeRange, setActiveRange] = useState<HistoryRange | null>('1y')
 
   // ── Visibility (first 8 by default) ──────────────

@@ -34,8 +34,8 @@ async def ping_host(host: str, timeout_sec: float = 1.0) -> bool:
     Uses OS `ping` command (no admin needed, cross-platform).
     """
     if _IS_WINDOWS:
-        # Windows: -n count, -w timeout (ms)
-        cmd = ["ping", "-n", "1", "-w", str(int(timeout_sec * 1000)), host]
+        # Windows: -n count, -w timeout (ms), -4 force IPv4
+        cmd = ["ping", "-n", "1", "-4", "-w", str(int(timeout_sec * 1000)), host]
     else:
         # Linux/Mac: -c count, -W timeout (sec)
         cmd = ["ping", "-c", "1", "-W", str(max(1, int(timeout_sec))), host]
@@ -47,7 +47,7 @@ async def ping_host(host: str, timeout_sec: float = 1.0) -> bool:
             stderr=asyncio.subprocess.DEVNULL,
         )
         try:
-            await asyncio.wait_for(proc.wait(), timeout=timeout_sec + 1.5)
+            await asyncio.wait_for(proc.wait(), timeout=timeout_sec + 2.0)
         except asyncio.TimeoutError:
             try:
                 proc.kill()
@@ -55,8 +55,9 @@ async def ping_host(host: str, timeout_sec: float = 1.0) -> bool:
                 pass
             return False
         return proc.returncode == 0
-    except Exception as exc:
-        logger.debug("ping_host(%s) failed: %s", host, exc)
+    except Exception:
+        # Silently return False — no need to log every failed ping,
+        # PingMonitor._cycle_once logs the summary.
         return False
 
 
@@ -177,7 +178,9 @@ class PingMonitor:
 
         online_count  = sum(1 for _, ok in results if ok)
         offline_count = len(results) - online_count
-        logger.info(
+        # Only log at INFO when state changes, otherwise DEBUG (avoid terminal spam)
+        log = logger.info if changes > 0 else logger.debug
+        log(
             "PingMonitor cycle=%s online=%s offline=%s changes=%s",
             self._cycle, online_count, offline_count, changes,
         )

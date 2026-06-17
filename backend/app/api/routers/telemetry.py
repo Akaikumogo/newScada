@@ -174,6 +174,49 @@ async def get_history_page(
 
 
 # ──────────────────────────────────────────────
+#  First / Last — delta accounting helper
+# ──────────────────────────────────────────────
+#
+#  Returns the very first and very last recorded value within [from_ts, to_ts).
+#  Used by formula blocks for delta calculations:
+#    kunlik_kirish = last(A+, 00:00..24:00) - first(A+, 00:00..24:00)
+#
+
+@router.get("/first-last")
+async def get_first_last(
+    device_id:   int      = Query(..., ge=1),
+    signal_name: str      = Query(..., min_length=1),
+    from_ts:     datetime = Query(..., description="Range start (inclusive)"),
+    to_ts:       datetime = Query(..., description="Range end (exclusive)"),
+    db: AsyncSession = Depends(get_db),
+):
+    if to_ts <= from_ts:
+        return {"first": None, "last": None, "first_ts": None, "last_ts": None}
+
+    base = (
+        Record.device_id   == device_id,
+        Record.signal_name == signal_name,
+        Record.captured_at >= from_ts,
+        Record.captured_at <  to_ts,
+    )
+
+    first_rec = (await db.execute(
+        select(Record).where(*base).order_by(Record.captured_at.asc()).limit(1)
+    )).scalar_one_or_none()
+
+    last_rec = (await db.execute(
+        select(Record).where(*base).order_by(Record.captured_at.desc()).limit(1)
+    )).scalar_one_or_none()
+
+    return {
+        "first":    float(first_rec.value)             if first_rec else None,
+        "last":     float(last_rec.value)              if last_rec  else None,
+        "first_ts": first_rec.captured_at.isoformat()  if first_rec else None,
+        "last_ts":  last_rec.captured_at.isoformat()   if last_rec  else None,
+    }
+
+
+# ──────────────────────────────────────────────
 #  Range — custom from/to with adaptive bucketing
 # ──────────────────────────────────────────────
 #
@@ -366,7 +409,8 @@ async def list_diff_signals(
 
     If `substation_id` is given, only devices in that substation are counted.
     """
-    sql = text("""
+    sub_filter = "AND d.substation_id = :substation_id" if substation_id is not None else ""
+    sql = text(f"""
         SELECT
             ds.signal_title,
             COUNT(DISTINCT ds.device_id)                  AS device_count,
@@ -377,15 +421,15 @@ async def list_diff_signals(
         WHERE (ds.active = true OR ds.only_realtime = true)
           AND ds.signal_title IS NOT NULL
           AND ds.signal_title <> ''
-          AND (:substation_id IS NULL OR d.substation_id = :substation_id)
+          {sub_filter}
         GROUP BY ds.signal_title
         HAVING COUNT(DISTINCT ds.device_id) >= :min_devices
         ORDER BY device_count DESC, ds.signal_title
     """)
-    result = await db.execute(sql, {
-        "min_devices":   min_devices,
-        "substation_id": substation_id,
-    })
+    params: dict = {"min_devices": min_devices}
+    if substation_id is not None:
+        params["substation_id"] = substation_id
+    result = await db.execute(sql, params)
     return [
         {
             "signal_title": row.signal_title,
@@ -618,8 +662,7 @@ async def get_device_activity(
         result_devices.append({
             "device_id": device.id,
             "name": device.name,
-            "host": device.iec104_host,
-            "port": device.iec104_port,
+            "common_address": device.iec104_common_address,
             "bucket_count": bucket_count,
             "active_buckets": active_count,
             "uptime_percent": uptime_percent,

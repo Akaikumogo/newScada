@@ -53,7 +53,7 @@ async def create_device(payload: DeviceCreate, db: AsyncSession = Depends(get_db
         iec104_host=payload.iec104_host,
         iec104_port=payload.iec104_port,
         iec104_common_address=payload.iec104_common_address,
-        poll_interval_seconds=payload.poll_interval_seconds,
+        active=payload.active,
     )
     db.add(device)
     await db.flush()
